@@ -4,6 +4,7 @@ import {
   Sparkles, CheckCircle, Car, User, Phone, MapPin, Clock, 
   ArrowRight, ShieldCheck, RefreshCw, AlertCircle 
 } from 'lucide-react';
+import io from 'socket.io-client';
 import { BACKEND_URL } from '../utils/api';
 import './RideDispatch.css';
 
@@ -23,9 +24,35 @@ export default function AdminRideDispatch() {
   useEffect(() => {
     fetchPendingRides();
     fetchDrivers();
+
+    const socket = io(BASE_URL, {
+      transports: ['websocket', 'polling'],
+      reconnection: true
+    });
+
+    socket.on('connect', () => {
+      socket.emit('join-admin');
+    });
+
+    socket.on('new-ride', (newRide) => {
+      fetchPendingRides();
+    });
+
+    socket.on('ride-dispatched', (updated) => {
+      fetchPendingRides();
+    });
+
+    socket.on('ride-update', () => {
+      fetchPendingRides();
+    });
+
     const interval = setInterval(fetchPendingRides, 5000); // 5s live polling
-    return () => clearInterval(interval);
+    return () => {
+      socket.disconnect();
+      clearInterval(interval);
+    };
   }, []);
+
 
   // 1. Fetch pending customer requests
   const fetchPendingRides = async () => {
