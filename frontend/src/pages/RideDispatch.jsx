@@ -42,18 +42,24 @@ const RideDispatch = () => {
   const fetchData = async () => {
     try {
       setLoading(true);
-      const [reqRes, drvRes] = await Promise.all([
-        fetch(`${BACKEND_URL}/api/requests`),
-        fetch(`${BACKEND_URL}/admin/driver`, {
-          headers: { Authorization: `Bearer ${localStorage.getItem('admin_token')}` }
-        })
-      ]);
+      const token = localStorage.getItem('admin_token');
+      
+      // Try /api/ride/pending first, fallback to /api/requests
+      let reqRes = await fetch(`${BACKEND_URL}/api/ride/pending`).catch(() => null);
+      if (!reqRes || !reqRes.ok) {
+        reqRes = await fetch(`${BACKEND_URL}/api/requests`);
+      }
+
+      const drvRes = await fetch(`${BACKEND_URL}/admin/driver`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
 
       const reqData = await reqRes.json();
       const drvData = await drvRes.json();
 
-      if (reqData.success && reqData.data?.requests) {
-        const mappedReqs = reqData.data.requests.map(r => ({
+      const rawRequests = reqData.data?.requests || (Array.isArray(reqData.data) ? reqData.data : []);
+      if (reqData.success && rawRequests.length > 0) {
+        const mappedReqs = rawRequests.map(r => ({
           _id: r._id,
           id: r.requestId || r._id,
           passenger: r.customerName || 'Passenger',
@@ -146,18 +152,32 @@ const RideDispatch = () => {
   // Handle Dispatch via API (Instant Ajax Update without page reload)
   const handleDispatch = async (driver) => {
     const rideId = selectedRide._id || selectedRide.id;
+    const driverId = driver._id || driver.id;
     const driverName = driver.personalInfo.name;
 
     try {
-      await fetch(`${BACKEND_URL}/api/assignments`, {
+      // 1. Call POST /api/ride/assign as specified by Flutter/backend teammate
+      let res = await fetch(`${BACKEND_URL}/api/ride/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          requestId: rideId,
-          driverId: driver._id || driver.id,
-          remarks: `Smart Dispatched to ${driverName}`
+          rideId: rideId,
+          driverId: driverId
         })
-      });
+      }).catch(() => null);
+
+      if (!res || !res.ok) {
+        // Fallback to /api/assignments
+        await fetch(`${BACKEND_URL}/api/assignments`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            requestId: rideId,
+            driverId: driverId,
+            remarks: `Smart Dispatched to ${driverName}`
+          })
+        });
+      }
     } catch (err) {
       console.error('Dispatch API error:', err);
     }

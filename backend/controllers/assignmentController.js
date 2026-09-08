@@ -5,17 +5,18 @@ import { sendSuccess, sendError } from '../middleware/responseHandler.js';
 // @route   POST /api/assignments
 export const createAssignment = async (req, res, next) => {
   try {
-    const { requestId, driverId, remarks } = req.body;
+    const { requestId, rideId, driverId, remarks } = req.body;
+    const targetRideId = rideId || requestId;
 
-    if (!requestId || !driverId) {
-      return sendError(res, 'Both requestId and driverId are required', 400);
+    if (!targetRideId || !driverId) {
+      return sendError(res, 'Both rideId (or requestId) and driverId are required', 400);
     }
 
     // Find Request
-    const reqFilter = requestId.match(/^[0-9a-fA-F]{24}$/) ? { _id: requestId } : { requestId };
+    const reqFilter = targetRideId.match(/^[0-9a-fA-F]{24}$/) ? { _id: targetRideId } : { requestId: targetRideId };
     const request = await RequestDB.findOne(reqFilter);
     if (!request) {
-      return sendError(res, `Ride request not found: ${requestId}`, 404);
+      return sendError(res, `Ride request not found: ${targetRideId}`, 404);
     }
 
     // Find Driver

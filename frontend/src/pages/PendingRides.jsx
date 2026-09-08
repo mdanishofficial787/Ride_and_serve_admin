@@ -4,7 +4,7 @@ import {
   Car, User, Settings2, AlertTriangle, ChevronDown, ChevronUp, 
   X, ShieldAlert, UserPlus, Check, RefreshCw
 } from 'lucide-react';
-import { BACKEND_URL } from '../utils/api';
+import { BACKEND_URL, RideAPI } from '../utils/api';
 import './PendingRides.css';
 
 const STATUS_FILTERS = [
@@ -35,10 +35,14 @@ const PendingRides = () => {
 
   const fetchPendingRides = async () => {
     try {
-      const res = await fetch(`${BACKEND_URL}/api/requests/pending`);
+      let res = await fetch(`${BACKEND_URL}/api/ride/pending`).catch(() => null);
+      if (!res || !res.ok) {
+        res = await fetch(`${BACKEND_URL}/api/requests/pending`);
+      }
       const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        const mapped = data.data.map(r => ({
+      const rawList = Array.isArray(data.data) ? data.data : (data.data?.requests || []);
+      if (data.success && rawList.length > 0) {
+        const mapped = rawList.map(r => ({
           _id: r._id,
           id: r.requestId || r._id,
           passenger: r.customerName || 'Passenger',
@@ -147,10 +151,23 @@ const PendingRides = () => {
     );
   };
 
-  const handleAssignSubmit = (e) => {
+  const handleAssignSubmit = async (e) => {
     e.preventDefault();
     if (!assignModal.ride) return;
     const { ride, selectedDriver } = assignModal;
+    const targetRideId = ride._id || ride.id;
+    // Extract driver ID if code string (e.g. DRV-1001 from 'DRV-1001 (Ahmed Khan - Toyota Corolla)')
+    const driverIdMatch = selectedDriver.match(/DRV-[0-9]+/i);
+    const targetDriverId = driverIdMatch ? driverIdMatch[0] : selectedDriver;
+
+    try {
+      await RideAPI.assign(targetRideId, targetDriverId, {
+        remarks: `Manually Assigned to ${selectedDriver}`
+      });
+    } catch (err) {
+      console.warn('Assign API warning:', err);
+    }
+
     setAssignModal({ isOpen: false, ride: null, selectedDriver: '' });
     executeAction(
       ride.id,

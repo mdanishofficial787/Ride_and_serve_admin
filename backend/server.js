@@ -58,10 +58,13 @@ app.get('/api/health', (req, res) => {
   sendSuccess(res, { uptime: process.uptime(), timestamp: new Date() }, 'API Health OK');
 });
 
+import rideRoutes from './routes/rideRoutes.js';
+
 // API Routes
 app.use('/api/drivers', driverRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/assignments', assignmentRoutes);
+app.use('/api/ride', rideRoutes);
 
 import adminPasswordResetRoutes from './routes/adminPasswordResetRoutes.js';
 import adminDriverRatingRoutes from './routes/adminDriverRatingRoutes.js';

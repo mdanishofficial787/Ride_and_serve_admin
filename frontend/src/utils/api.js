@@ -123,3 +123,18 @@ export const AssignmentAPI = {
     return request(`/assignments${query ? `?${query}` : ''}`);
   }
 };
+
+export const RideAPI = {
+  // GET /api/ride/pending - Fetch unassigned incoming customer rides
+  getPending: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/ride/pending${query ? `?${query}` : ''}`);
+  },
+
+  // POST /api/ride/assign - Assign selected driver to ride
+  assign: (rideId, driverId, extraData = {}) => request('/ride/assign', {
+    method: 'POST',
+    body: JSON.stringify({ rideId, driverId, ...extraData })
+  })
+};
+
