@@ -141,14 +141,166 @@ export const getDriverAssignedRides = async (req, res, next) => {
       }
     }
 
-    const rides = await RequestDB.find(query, { updatedAt: -1, createdAt: -1 }, 0, 100);
+// @desc    Get all rides with mapped structure & pending/assigned counts
+// @route   GET /api/rides
+export const getAllRides = async (req, res, next) => {
+  try {
+    const rawRides = await RequestDB.find({}, { createdAt: -1, updatedAt: -1 }, 0, 200);
 
-    return sendSuccess(res, {
-      rides,
-      total: rides.length
-    }, 'Driver assigned rides retrieved successfully');
+    let pendingCount = 0;
+    let assignedCount = 0;
+
+    const rides = rawRides.map(r => {
+      const isAssigned = r.status === 'ASSIGNED' || (r.status && r.status.startsWith('Dispatched')) || !!r.assignedDriverDetails?.name;
+      if (isAssigned) {
+        assignedCount++;
+      } else {
+        pendingCount++;
+      }
+
+      const passengerName = r.customerName || r.passenger?.name || 'Passenger';
+      const passengerPhone = r.customerPhone || r.passenger?.phone || '+92 300 1234567';
+      const pickup = r.pickupLocation || 'Islamabad';
+      const drop = r.dropLocation || 'Rawalpindi';
+      const vehiclePref = r.vehiclePreference || r.preferences?.vehicleCategory || 'Sedan';
+      const acReq = r.acRequired !== false;
+
+      return {
+        _id: r._id,
+        requestId: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
+        passenger: {
+          name: passengerName,
+          phone: passengerPhone,
+          email: r.customerEmail || r.passenger?.email || '',
+          gender: r.gender || 'Male'
+        },
+        route: {
+          summary: `${pickup} ➔ ${drop}`,
+          pickupLocation: pickup,
+          dropLocation: drop,
+          passengers: `${r.seatsNeeded || 1} Passenger(s)`
+        },
+        pickupLocation: pickup,
+        dropLocation: drop,
+        scheduledTime: `${r.date || ''} ${r.timeToLeave || ''}`.trim() || 'Today 08:00 AM',
+        date: `${r.date || ''} ${r.timeToLeave || ''}`.trim() || 'Today 08:00 AM',
+        vehicle: {
+          category: vehiclePref,
+          ac: acReq,
+          label: `${vehiclePref}${acReq ? ' • AC' : ' • Non-AC'}`
+        },
+        preferences: {
+          vehicleCategory: vehiclePref,
+          acRequired: acReq
+        },
+        fareFormatted: r.fare || 'Rs. 2,500',
+        fare: r.fare || 'Rs. 2,500',
+        seatsNeeded: r.seatsNeeded || 1,
+        status: isAssigned ? 'ASSIGNED' : 'Pending Dispatch',
+        driverId: r.driverId,
+        assignedDriverDetails: r.assignedDriverDetails
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      pendingCount,
+      assignedCount,
+      totalCount: rides.length,
+      data: {
+        rides,
+        pendingCount,
+        assignedCount
+      },
+      rides
+    });
   } catch (err) {
     next(err);
   }
 };
+
+// @desc    Dispatch driver to a ride request (PATCH /api/rides/:id/dispatch)
+// @route   PATCH /api/rides/:id/dispatch
+export const dispatchDriverToRide = async (req, res, next) => {
+  try {
+    const { id } = req.params;
+    const { driverName, driverId, remarks } = req.body;
+
+    if (!id) {
+      return sendError(res, 'Ride ID is required', 400);
+    }
+
+    const isMongoId = id.match(/^[0-9a-fA-F]{24}$/);
+    const reqFilter = isMongoId ? { _id: id } : { requestId: id };
+    const request = await RequestDB.findOne(reqFilter);
+
+    if (!request) {
+      return sendError(res, `Ride request not found: ${id}`, 404);
+    }
+
+    let driver = null;
+    if (driverId) {
+      const drvMongo = driverId.match(/^[0-9a-fA-F]{24}$/);
+      driver = await DriverDB.findOne(drvMongo ? { _id: driverId } : { driverId });
+    }
+
+    if (!driver && driverName) {
+      driver = await DriverDB.findOne({
+        $or: [
+          { name: new RegExp(`^${driverName.trim()}$`, 'i') },
+          { 'personalInfo.name': new RegExp(`^${driverName.trim()}$`, 'i') }
+        ]
+      });
+    }
+
+    const assignedDriverName = driverName || driver?.name || driver?.personalInfo?.name || 'Assigned Driver';
+    const assignedDriverCode = driver?.driverId || driver?.id || `DRV-${String(driver?._id || id).slice(-6).toUpperCase()}`;
+    const assignedPhone = driver?.phone || driver?.personalInfo?.phone || '+92 300 0000000';
+    const assignedVehicle = driver ? `${driver.vehicleDetails?.make || driver.vehicleInfo?.make || ''} ${driver.vehicleDetails?.model || driver.vehicleInfo?.model || ''}`.trim() || driver.vehicleType || 'Sedan' : 'Vehicle';
+    const assignedRating = driver?.rating || driver?.performance?.rating || 4.8;
+
+    // Create Assignment Record
+    await AssignmentDB.create({
+      requestId: request._id,
+      driverId: driver?._id || driverId || null,
+      status: 'ASSIGNED',
+      remarks: remarks || `Dispatched to ${assignedDriverName}`
+    });
+
+    // Update Request
+    await RequestDB.update(reqFilter, {
+      status: 'ASSIGNED',
+      driverId: driver?._id || driverId || null,
+      assignedDriverDetails: {
+        driverCode: assignedDriverCode,
+        name: assignedDriverName,
+        phone: assignedPhone,
+        vehicle: assignedVehicle,
+        rating: assignedRating
+      },
+      $push: {
+        timeline: {
+          action: 'DISPATCHED',
+          performedBy: 'Dispatcher',
+          details: `Ride assigned to ${assignedDriverName} (${assignedDriverCode})`
+        }
+      }
+    });
+
+    if (driver) {
+      await DriverDB.update({ _id: driver._id }, { availability: 'On Trip' });
+    }
+
+    return sendSuccess(res, {
+      rideId: request._id,
+      requestId: request.requestId,
+      status: 'ASSIGNED',
+      driverName: assignedDriverName,
+      driverCode: assignedDriverCode
+    }, `Driver ${assignedDriverName} successfully dispatched to ride ${request.requestId || id}`);
+  } catch (err) {
+    next(err);
+  }
+};
+
 

@@ -36,6 +36,8 @@ const RideDispatch = () => {
   const [rideRequests, setRideRequests] = useState([]);
   const [availableDriversLocal, setAvailableDriversLocal] = useState([]);
   const [assignedRides, setAssignedRides] = useState([]);
+  const [pendingCount, setPendingCount] = useState(0);
+  const [assignedCount, setAssignedCount] = useState(0);
   const [selectedRide, setSelectedRide] = useState(null);
   const [viewPassengerModal, setViewPassengerModal] = useState(null);
   const [viewDriverModal, setViewDriverModal] = useState(null);
@@ -55,59 +57,100 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // Fetch real ride requests, assigned rides, and drivers from database
+  // Fetch real ride requests (pending & assigned) and drivers from live backend
   const fetchData = async () => {
     try {
       setLoading(true);
       const token = localStorage.getItem('admin_token');
       
-      // 1. Try /api/ride/pending first, fallback to /api/requests
-      let reqRes = await fetch(`${BACKEND_URL}/api/ride/pending`).catch(() => null);
-      if (!reqRes || !reqRes.ok) {
-        reqRes = await fetch(`${BACKEND_URL}/api/requests`);
-      }
+      // 1. Make GET /api/rides (prioritizing http://localhost:3000/api/rides)
+      const ridesRes = await RideAPI.getAllRides().catch(() => null);
 
-      // 2. Fetch Assigned Rides
-      let assignedRes = await fetch(`${BACKEND_URL}/api/ride/assigned`).catch(() => null);
-      if (assignedRes && assignedRes.ok) {
-        const assignedData = await assignedRes.json();
-        const rawAssigned = assignedData.data?.rides || assignedData.data || [];
-        setAssignedRides(Array.isArray(rawAssigned) ? rawAssigned : []);
-      }
-
-      // 3. Fetch Drivers
+      // 2. Fetch Drivers
       const drvRes = await fetch(`${BACKEND_URL}/admin/driver`, {
         headers: { Authorization: `Bearer ${token}` }
-      });
+      }).catch(() => null);
 
-      const reqData = await reqRes.json();
-      const drvData = await drvRes.json();
+      const drvData = drvRes && drvRes.ok ? await drvRes.json() : { success: false };
 
-      const rawRequests = reqData.data?.requests || (Array.isArray(reqData.data) ? reqData.data : []);
-      if (reqData.success && rawRequests.length > 0) {
-        const mappedReqs = rawRequests.map(r => ({
-          _id: r._id,
-          id: r.requestId || r._id,
-          passenger: r.customerName || 'Passenger',
-          phone: r.customerPhone || '+92 300 1234567',
-          email: r.customerEmail || 'passenger@example.com',
-          gender: r.gender || 'Male',
-          pickupLocation: r.pickupLocation || 'Blue Area, Islamabad',
-          dropLocation: r.dropLocation || 'Saddar, Rawalpindi',
-          route: `${r.pickupLocation} -> ${r.dropLocation}`,
-          date: `${r.date || ''} ${r.timeToLeave || ''}`.trim() || 'Today 08:00 AM',
-          fare: r.fare || 'Rs. 2,500',
-          status: r.status === 'Visible' || r.status === 'PENDING' ? 'Pending Dispatch' : r.status,
-          seatsNeeded: r.seatsNeeded || 1,
-          preferences: {
-            vehicleCategory: r.vehiclePreference || 'Sedan',
-            acRequired: r.acRequired !== false
-          }
-        }));
-        setRideRequests(mappedReqs);
+      // Parse rides payload from response
+      const rawList = ridesRes?.rides || ridesRes?.data?.rides || ridesRes?.data?.requests || (Array.isArray(ridesRes?.data) ? ridesRes.data : (Array.isArray(ridesRes) ? ridesRes : []));
+      
+      if (rawList && rawList.length > 0) {
+        const mappedAll = rawList.map(r => {
+          const pName = r.passenger?.name || r.customerName || r.passenger || 'Passenger';
+          const pPhone = r.passenger?.phone || r.customerPhone || r.phone || '+92 300 1234567';
+          const pEmail = r.passenger?.email || r.customerEmail || r.email || 'passenger@example.com';
+          const pGender = r.passenger?.gender || r.gender || 'Male';
+          const pickup = r.pickupLocation || r.route?.pickupLocation || (typeof r.route === 'string' ? r.route.split('->')[0]?.trim() : 'Islamabad');
+          const drop = r.dropLocation || r.route?.dropLocation || (typeof r.route === 'string' ? r.route.split('->')[1]?.trim() : 'Rawalpindi');
+          const routeSummary = r.route?.summary || `${pickup} ➔ ${drop}`;
+          const routePassengers = r.route?.passengers || `${r.seatsNeeded || 1} Passenger(s)`;
+          const schedTime = r.scheduledTime || `${r.date || ''} ${r.timeToLeave || ''}`.trim() || r.date || 'Today 08:00 AM';
+          const vCategory = r.vehicle?.category || r.vehiclePreference || r.preferences?.vehicleCategory || 'Sedan';
+          const vAc = r.vehicle?.ac !== undefined ? r.vehicle.ac : (r.acRequired !== false);
+          const vLabel = r.vehicle?.label || `${vCategory}${vAc ? ' • AC' : ' • Non-AC'}`;
+          const fareFmt = r.fareFormatted || r.fare || 'Rs. 2,500';
+          
+          const isAssigned = r.status === 'ASSIGNED' || (r.status && r.status.startsWith('Dispatched')) || !!r.assignedDriverDetails?.name;
+          const statusStr = isAssigned ? 'ASSIGNED' : (r.status === 'Visible' || r.status === 'PENDING' ? 'Pending Dispatch' : (r.status || 'Pending Dispatch'));
+
+          return {
+            _id: r._id || r.id,
+            id: r.requestId || r.id || (r._id ? `REQ-${String(r._id).slice(-4).toUpperCase()}` : 'REQ-8000'),
+            requestId: r.requestId || r.id || (r._id ? `REQ-${String(r._id).slice(-4).toUpperCase()}` : 'REQ-8000'),
+            passenger: {
+              name: pName,
+              phone: pPhone,
+              email: pEmail,
+              gender: pGender
+            },
+            customerName: pName,
+            customerPhone: pPhone,
+            phone: pPhone,
+            email: pEmail,
+            gender: pGender,
+            pickupLocation: pickup,
+            dropLocation: drop,
+            route: {
+              summary: routeSummary,
+              pickupLocation: pickup,
+              dropLocation: drop,
+              passengers: routePassengers
+            },
+            scheduledTime: schedTime,
+            date: schedTime,
+            vehicle: {
+              label: vLabel,
+              category: vCategory,
+              ac: vAc
+            },
+            preferences: {
+              vehicleCategory: vCategory,
+              acRequired: vAc
+            },
+            fareFormatted: fareFmt,
+            fare: fareFmt,
+            seatsNeeded: r.seatsNeeded || 1,
+            status: statusStr,
+            driverId: r.driverId,
+            assignedDriverDetails: r.assignedDriverDetails
+          };
+        });
+
+        const pendingList = mappedAll.filter(r => r.status !== 'ASSIGNED' && !r.status.startsWith('Dispatched'));
+        const assignedList = mappedAll.filter(r => r.status === 'ASSIGNED' || r.status.startsWith('Dispatched'));
+
+        setRideRequests(pendingList);
+        setAssignedRides(assignedList);
+
+        const respPendingCount = ridesRes?.pendingCount ?? ridesRes?.data?.pendingCount ?? pendingList.length;
+        const respAssignedCount = ridesRes?.assignedCount ?? ridesRes?.data?.assignedCount ?? assignedList.length;
+        setPendingCount(respPendingCount);
+        setAssignedCount(respAssignedCount);
       }
 
-      if (drvData.success && drvData.data?.drivers) {
+      if (drvData?.success && drvData?.data?.drivers) {
         const mappedDrivers = drvData.data.drivers.map(d => {
           const vData = d.vehicleData || d.vehicleDetails || {};
           return {
@@ -190,61 +233,39 @@ const RideDispatch = () => {
     }
   };
 
-  // Handle Dispatch via API (Instant Ajax Update without page reload)
+  // Handle Dispatch via PATCH /api/rides/:id/dispatch
   const handleDispatch = async (driver) => {
     const rideId = selectedRide._id || selectedRide.id;
     const driverId = driver._id || driver.id;
-    const driverName = driver.personalInfo.name;
+    const driverName = driver.personalInfo?.name || driver.name || 'Ali Khan';
 
     try {
-      // 1. Call POST /api/ride/assign as specified by Flutter/backend teammate
-      let res = await fetch(`${BACKEND_URL}/api/ride/assign`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          rideId: rideId,
-          driverId: driverId,
-          remarks: `Smart Dispatched to ${driverName}`
-        })
-      }).catch(() => null);
-
-      if (!res || !res.ok) {
-        // Fallback to /api/assignments
-        await fetch(`${BACKEND_URL}/api/assignments`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            requestId: rideId,
-            driverId: driverId,
-            remarks: `Smart Dispatched to ${driverName}`
-          })
-        });
-      }
+      // Call live backend PATCH http://localhost:3000/api/rides/:id/dispatch with { "driverName": "Ali Khan" }
+      await RideAPI.dispatch(rideId, driverName, driverId);
     } catch (err) {
       console.error('Dispatch API error:', err);
     }
 
     // Immediately update reactive local state with no page refresh
-    setRideRequests(prev => prev.map(r => 
-      r.id === selectedRide.id ? { ...r, status: `Dispatched to ${driverName}` } : r
-    ));
+    setRideRequests(prev => prev.filter(r => (r._id || r.id) !== rideId));
 
     // Add newly assigned ride to local assigned list
     const newAssignedTrip = {
-      _id: selectedRide._id || selectedRide.id,
-      requestId: selectedRide.id,
-      customerName: selectedRide.passenger,
-      customerPhone: selectedRide.phone,
+      _id: rideId,
+      requestId: selectedRide.requestId || selectedRide.id,
+      customerName: selectedRide.passenger?.name || selectedRide.customerName,
+      customerPhone: selectedRide.passenger?.phone || selectedRide.customerPhone,
       pickupLocation: selectedRide.pickupLocation,
       dropLocation: selectedRide.dropLocation,
-      date: selectedRide.date,
-      fare: selectedRide.fare,
+      scheduledTime: selectedRide.scheduledTime || selectedRide.date,
+      date: selectedRide.scheduledTime || selectedRide.date,
+      fare: selectedRide.fareFormatted || selectedRide.fare,
       status: 'ASSIGNED',
-      driverId: driver._id || driver.id,
+      driverId: driverId,
       assignedDriverDetails: {
         driverCode: driver.id,
-        name: driver.personalInfo.name,
-        phone: driver.personalInfo.phone,
+        name: driverName,
+        phone: driver.personalInfo?.phone || driver.phone,
         vehicle: `${driver.vehicleInfo.make} ${driver.vehicleInfo.model}`,
         rating: driver.performance.rating
       },
@@ -252,8 +273,10 @@ const RideDispatch = () => {
     };
 
     setAssignedRides(prev => [newAssignedTrip, ...prev.filter(a => a._id !== newAssignedTrip._id && a.requestId !== newAssignedTrip.requestId)]);
+    setPendingCount(prev => Math.max(0, prev - 1));
+    setAssignedCount(prev => prev + 1);
 
-    setToastMessage(`✓ Ride ${selectedRide.id} successfully assigned to ${driverName}!`);
+    setToastMessage(`✓ Ride ${selectedRide.requestId || selectedRide.id} successfully dispatched to ${driverName}!`);
     setToastActionDriver(driver);
     setTimeout(() => {
       setToastMessage('');
@@ -410,14 +433,14 @@ const RideDispatch = () => {
             <table className="clean-table">
               <thead>
                 <tr>
-                  <th>Request ID</th>
-                  <th>Passenger</th>
-                  <th>Route & Dropoff</th>
-                  <th>Scheduled Time</th>
-                  <th>Vehicle & AC</th>
-                  <th>Fare</th>
-                  <th>Status</th>
-                  <th style={{ textAlign: 'right' }}>Actions</th>
+                  <th>REQUEST ID</th>
+                  <th>PASSENGER</th>
+                  <th>ROUTE & DROP-OFF</th>
+                  <th>SCHEDULED TIME</th>
+                  <th>VEHICLE & AC</th>
+                  <th>FARE</th>
+                  <th>STATUS</th>
+                  <th style={{ textAlign: 'right' }}>ACTIONS</th>
                 </tr>
               </thead>
               <tbody>
@@ -436,43 +459,43 @@ const RideDispatch = () => {
                       onClick={() => handleSelectRide(ride)}
                     >
                       <td>
-                        <span className="id-pill font-mono">{ride.id}</span>
+                        <span className="id-pill font-mono">{ride.requestId || ride.id}</span>
                       </td>
                       <td>
                         <div className="passenger-table-cell">
                           <div className="avatar-circle">
-                            {ride.passenger.charAt(0)}
+                            {(ride.passenger?.name || ride.customerName || 'P').charAt(0)}
                           </div>
                           <div>
-                            <strong>{ride.passenger}</strong>
-                            <div className="text-xs text-secondary">{ride.phone}</div>
+                            <strong>{ride.passenger?.name || ride.customerName}</strong>
+                            <div className="text-xs text-secondary">{ride.passenger?.phone || ride.customerPhone}</div>
                           </div>
                         </div>
                       </td>
                       <td>
                         <div className="route-table-cell">
-                          <span className="route-pickup">{ride.pickupLocation.split(',')[0]}</span>
+                          <span className="route-pickup">{(ride.pickupLocation || '').split(',')[0]}</span>
                           <span className="route-arrow">➔</span>
-                          <span className="route-drop">{ride.dropLocation.split(',')[0]}</span>
+                          <span className="route-drop">{(ride.dropLocation || '').split(',')[0]}</span>
                         </div>
-                        <div className="text-xs text-secondary mt-1">{ride.seatsNeeded} Passenger(s)</div>
+                        <div className="text-xs text-secondary mt-1">{ride.route?.passengers || `${ride.seatsNeeded || 1} Passenger(s)`}</div>
                       </td>
                       <td>
                         <div className="d-flex align-items-center gap-1 text-sm">
                           <Clock size={13} className="text-secondary" />
-                          <span>{ride.date}</span>
+                          <span>{ride.scheduledTime || ride.date}</span>
                         </div>
                       </td>
                       <td>
                         <div className="vehicle-pill">
-                          <span>{ride.preferences.vehicleCategory}</span>
-                          {ride.preferences.acRequired && (
+                          <span>{ride.vehicle?.label || ride.preferences?.vehicleCategory}</span>
+                          {ride.preferences?.acRequired && !ride.vehicle?.label?.includes('AC') && (
                             <span className="ac-chip"><Wind size={11} /> AC</span>
                           )}
                         </div>
                       </td>
                       <td>
-                        <span className="fare-badge">{ride.fare}</span>
+                        <span className="fare-badge">{ride.fareFormatted || ride.fare}</span>
                       </td>
                       <td>
                         <span className={`status-badge ${ride.status.toLowerCase().includes('pending') ? 'pending' : 'approved'}`}>
@@ -1053,8 +1076,8 @@ const RideDispatch = () => {
         >
           <Sparkles size={16} />
           <span>Dispatch Console (Pending Rides)</span>
-          {rideRequests.length > 0 && (
-            <span className="tab-counter-badge">{rideRequests.length}</span>
+          {pendingCount > 0 && (
+            <span className="tab-counter-badge">{pendingCount}</span>
           )}
         </button>
 
@@ -1064,8 +1087,8 @@ const RideDispatch = () => {
         >
           <Smartphone size={16} />
           <span>Driver Panel & Live Assigned Trips</span>
-          {assignedRides.length > 0 && (
-            <span className="tab-counter-badge green-badge">{assignedRides.length}</span>
+          {assignedCount > 0 && (
+            <span className="tab-counter-badge green-badge">{assignedCount}</span>
           )}
         </button>
       </div>

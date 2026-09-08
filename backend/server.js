@@ -65,6 +65,7 @@ app.use('/api/drivers', driverRoutes);
 app.use('/api/requests', requestRoutes);
 app.use('/api/assignments', assignmentRoutes);
 app.use('/api/ride', rideRoutes);
+app.use('/api/rides', rideRoutes);
 
 import adminPasswordResetRoutes from './routes/adminPasswordResetRoutes.js';
 import adminDriverRatingRoutes from './routes/adminDriverRatingRoutes.js';
