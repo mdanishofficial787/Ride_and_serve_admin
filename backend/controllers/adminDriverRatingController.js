@@ -29,24 +29,25 @@ export const getDriversRatings = async (req, res) => {
         (l.driverReferenceId && l.driverReferenceId === (d.driverReferenceId || d.driverId))
       );
 
-      const currentRating = Number(d.rating) || (driverLogs.length > 0 ? driverLogs[0].score : 4.8);
-      const isRated = Boolean(d.rating || driverLogs.length > 0);
+      const isRated = Boolean(d.rating != null && Number(d.rating) > 0) || driverLogs.length > 0;
+      const currentRating = isRated 
+        ? Number((driverLogs.length > 0 ? driverLogs[0].score : d.rating).toFixed(1))
+        : null;
 
-      if (isRated) {
+      if (isRated && currentRating != null) {
         totalScore += currentRating;
         ratedCount++;
-      }
-
-      if (currentRating < 3.8 || !isRated) {
-        requiringReviewCount++;
+        if (currentRating < 3.0) {
+          requiringReviewCount++;
+        }
       }
 
       const lastLog = driverLogs[0] || null;
-      const lastRatedDate = lastLog?.createdAt || d.updatedAt || d.createdAt;
-      const ratedByName = lastLog?.ratedBy || 'Super Admin';
+      const lastRatedDate = lastLog?.createdAt || (isRated ? d.updatedAt : null);
+      const ratedByName = lastLog?.ratedBy || (isRated ? 'Admin' : null);
 
-      // Completed rides approximation / field
-      const completedRides = d.completedRides || Math.floor(((parseInt(d._id.toString().substring(18), 16) || 12) % 45) + 10);
+      // Authentic completed rides from DB
+      const completedRides = d.completedRides || d.totalRides || 0;
 
       return {
         _id: d._id,
@@ -59,44 +60,27 @@ export const getDriversRatings = async (req, res) => {
         status: d.verificationStatus || d.status || 'Pending',
         city: d.city || 'Islamabad',
         completedRides,
-        currentRating: Number(currentRating.toFixed(1)),
-        ratingCount: driverLogs.length || 1,
+        isRated,
+        currentRating,
+        ratingCount: driverLogs.length,
         lastRated: lastRatedDate,
         ratedBy: ratedByName,
-        lastRemarks: lastLog?.adminRemarks || 'Consistently maintains smooth passenger transit.',
-        lastTags: lastLog?.performanceTags || ['Punctual', 'Safe Driving']
+        lastRemarks: lastLog?.adminRemarks || '',
+        lastTags: lastLog?.performanceTags || []
       };
     });
 
-    const averageRating = ratedCount > 0 ? (totalScore / ratedCount).toFixed(1) : '4.8';
-
-    // Auto seed initial rating log if collection is fresh
-    if (allLogs.length === 0 && enrichedDrivers.length > 0) {
-      try {
-        const topDriver = enrichedDrivers[0];
-        await DriverRatingLog.create({
-          driver: topDriver._id,
-          driverReferenceId: topDriver.driverId,
-          driverName: topDriver.name,
-          score: 4.9,
-          performanceTags: ['Top Performer', 'Punctual', 'Clean Vehicle'],
-          adminRemarks: 'Excellent track record, high route adherence and zero passenger complaints.',
-          ratedBy: 'Super Admin'
-        });
-      } catch (seedErr) {
-        console.warn('Initial rating log notice:', seedErr.message);
-      }
-    }
+    const averageRating = ratedCount > 0 ? Number((totalScore / ratedCount).toFixed(1)) : 0;
 
     return res.status(200).json({
       success: true,
       data: {
         drivers: enrichedDrivers,
         kpis: {
-          totalRatedDrivers: ratedCount || enrichedDrivers.length,
-          averageRating: Number(averageRating),
-          ratedThisMonth: logsThisMonth.length || 6,
-          requiringReview: requiringReviewCount || 2
+          totalRatedDrivers: ratedCount,
+          averageRating: averageRating,
+          ratedThisMonth: logsThisMonth.length,
+          requiringReview: requiringReviewCount
         }
       },
       message: 'Driver ratings retrieved successfully'
@@ -138,7 +122,7 @@ export const getDriverRatingHistory = async (req, res) => {
           _id: driver._id,
           driverId: driver.driverReferenceId || driver.driverId,
           name: driver.Name || driver.name,
-          currentRating: driver.rating || 4.8
+          currentRating: driver.rating || null
         } : null,
         history: logs
       },

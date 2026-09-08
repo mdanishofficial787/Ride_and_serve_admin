@@ -132,21 +132,98 @@
   opacity: 0.8;
 }
 
-.badge-btn {
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  color: var(--text-primary);
-  font-size: 0.85rem;
-  font-weight: 600;
-  padding: 0.25rem 0.75rem;
-  border-radius: 50px;
-  transition: all var(--transition-fast);
+/* Pool Name Cell */
+.pool-name-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
 }
 
-.badge-btn:hover {
-  background: var(--accent-light);
-  color: var(--accent-primary);
-  border-color: var(--accent-primary);
+.pool-title {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.pool-route-subtext {
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 200px;
+}
+
+.passenger-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.vehicle-cell {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.badge-vehicle {
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  padding: 0.2rem 0.5rem;
+  border-radius: var(--radius-sm);
+  color: var(--text-primary);
+}
+
+.badge-ac {
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: #E0F2FE;
+  color: #0284C7;
+  padding: 0.15rem 0.4rem;
+  border-radius: var(--radius-sm);
+}
+
+/* Seat Capacity Cell & Live Bar */
+.seat-capacity-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  min-width: 130px;
+}
+
+.seat-bar-wrapper {
+  width: 100%;
+  height: 6px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.seat-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #10B981, #059669);
+  border-radius: 4px;
+  transition: width 0.3s ease;
+}
+
+.seat-bar-fill.full {
+  background: linear-gradient(90deg, #EF4444, #DC2626);
+}
+
+.seat-stats-text {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+}
+
+.seat-preview-box {
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 0.65rem 0.85rem;
 }
 
 /* Modals */
@@ -305,56 +382,132 @@
 }
 
 /* ==========================================================================
-   CREATE MANUAL RIDE MODAL STYLES (MATCHING USER SCREENSHOTS)
+   CREATE & EDIT MANUAL RIDE VIEW STYLES (THEME & DARK-MODE AWARE)
    ========================================================================== */
-.manual-ride-modal-card {
-  max-width: 620px !important;
-  width: 94% !important;
-  max-height: 88vh;
-  display: flex;
-  flex-direction: column;
-  background: #FFFFFF !important;
-  border-radius: 16px !important;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.15) !important;
+
+.manual-ride-fullpage-view {
+  width: 100%;
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 0.5rem 0 2.5rem 0;
 }
 
-.manual-ride-form-body {
-  padding: 1.5rem !important;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 1.25rem;
-  background: #F8FAFC;
+.manual-view-header {
+  margin-bottom: 1.75rem;
 }
 
-/* Section Cards */
+.back-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  color: var(--text-primary);
+  font-size: 0.85rem;
+  font-weight: 600;
+  padding: 0.5rem 0.95rem;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.back-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+}
+
+.manual-view-form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1.5rem;
+  align-items: start;
+}
+
+.manual-view-column {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Section Form Cards */
 .manual-form-card {
-  background: #FFFFFF;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
-  padding: 1.25rem 1.4rem;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  padding: 1.35rem 1.5rem;
+  box-shadow: var(--shadow-sm);
+  transition: border-color var(--transition-fast);
+}
+
+.manual-form-card:hover {
+  border-color: rgba(59, 130, 246, 0.4);
 }
 
 .manual-card-header {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
-  font-size: 0.95rem;
+  gap: 0.65rem;
+  font-size: 0.98rem;
   font-weight: 700;
-  color: #1E293B;
+  color: var(--text-primary);
   padding-bottom: 0.85rem;
-  margin-bottom: 1rem;
-  border-bottom: 1px solid #F1F5F9;
+  margin-bottom: 1.15rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
 .manual-section-icon {
-  color: #64748B;
+  color: var(--accent-primary);
 }
 
 .manual-card-content {
   display: flex;
   flex-direction: column;
+}
+
+/* Form Groups & Inputs */
+.manual-form-card .form-group {
+  margin-bottom: 1rem;
+}
+
+.manual-form-card .form-group:last-child {
+  margin-bottom: 0;
+}
+
+.manual-form-card .form-group label {
+  font-size: 0.74rem;
+  font-weight: 700;
+  color: var(--text-secondary);
+  letter-spacing: 0.6px;
+  text-transform: uppercase;
+  margin-bottom: 0.45rem;
+  display: block;
+}
+
+.manual-form-card .form-input,
+.manual-form-card .form-select {
+  width: 100%;
+  padding: 0.65rem 0.85rem;
+  background: var(--bg-primary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-primary);
+  font-size: 0.875rem;
+  font-family: inherit;
+  outline: none;
+  transition: all var(--transition-fast);
+}
+
+.manual-form-card .form-input:focus,
+.manual-form-card .form-select:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  background: var(--bg-secondary);
+}
+
+.manual-form-card .form-input::placeholder {
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
 .form-grid-2col {
@@ -363,209 +516,25 @@
   gap: 1rem;
 }
 
-.text-xs {
-  font-size: 0.72rem;
-  font-weight: 400;
-}
-
-/* Toggle Pills */
-.manual-toggle-pill {
-  display: flex;
-  align-items: center;
-  gap: 0.75rem;
-  padding: 0.65rem 1rem;
-  background: #FFFFFF;
-  border: 1.5px solid #CBD5E1;
-  border-radius: 10px;
-  cursor: pointer;
-  font-size: 0.88rem;
-  font-weight: 600;
-  color: #334155;
-  transition: all 0.2s ease;
-  user-select: none;
-}
-
-.manual-toggle-pill:hover {
-  border-color: #94A3B8;
-  background: #F8FAFC;
-}
-
-.manual-toggle-pill.active {
-  border-color: #2563EB;
-}
-
-.switch-knob {
-  width: 38px;
-  height: 22px;
-  background: #CBD5E1;
-  border-radius: 20px;
-  position: relative;
-  transition: background 0.2s ease;
-  flex-shrink: 0;
-}
-
-.switch-knob::after {
-  content: '';
-  position: absolute;
-  top: 2px;
-  left: 2px;
-  width: 18px;
-  height: 18px;
-  background: #FFFFFF;
-  border-radius: 50%;
-  transition: transform 0.2s ease;
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
-}
-
-.switch-knob.on {
-  background: #2563EB;
-}
-
-.switch-knob.on::after {
-  transform: translateX(16px);
-}
-
-/* Publish to Driver Pool Card */
-.publish-card {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 1.25rem 1.4rem;
-}
-
-.publish-card-left h4 {
-  font-size: 0.95rem;
-  font-weight: 700;
-  color: #1E293B;
-  margin-bottom: 0.2rem;
-}
-
-.publish-card-left p {
-  font-size: 0.82rem;
-  color: #64748B;
-  margin: 0;
-}
-
-.main-toggle-switch {
-  width: 46px;
-  height: 26px;
-  background: #CBD5E1;
-  border-radius: 20px;
-  position: relative;
-  cursor: pointer;
-  transition: background 0.2s ease;
-  flex-shrink: 0;
-}
-
-.main-toggle-switch .toggle-slider {
-  position: absolute;
-  top: 3px;
-  left: 3px;
-  width: 20px;
-  height: 20px;
-  background: #FFFFFF;
-  border-radius: 50%;
-  transition: transform 0.2s ease;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
-.main-toggle-switch.on {
-  background: #2563EB;
-}
-
-.main-toggle-switch.on .toggle-slider {
-  transform: translateX(20px);
-}
-
-/* Modal Actions Footer */
-.manual-modal-footer {
-  display: grid;
-  grid-template-columns: 1fr 1.5fr;
-  gap: 1rem;
-  margin-top: 0.5rem;
-  padding-top: 0.5rem;
-}
-
-.manual-cancel-btn {
-  padding: 0.75rem 1.5rem;
-  background: #FFFFFF;
-  color: #334155;
-  border: 1.5px solid #CBD5E1;
-  border-radius: 10px;
-  font-size: 0.92rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.15s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.manual-cancel-btn:hover {
-  background: #F1F5F9;
-  border-color: #94A3B8;
-}
-
-.manual-submit-btn {
-  padding: 0.75rem 1.5rem;
-  background: #5B8DEF;
-  color: #FFFFFF;
-  border: none;
-  border-radius: 10px;
-  font-size: 0.92rem;
-  font-weight: 700;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 14px rgba(91, 141, 239, 0.35);
-}
-
-.manual-submit-btn:hover {
-  background: #467AE8;
-  transform: translateY(-1px);
-  box-shadow: 0 6px 18px rgba(91, 141, 239, 0.45);
-}
-
-/* Date Input Wrapper (Clean text input with right calendar icon) */
-.manual-date-input-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-}
-
-.manual-date-field {
-  width: 100%;
-  padding-right: 2.75rem !important;
-}
-
-.manual-date-icon {
-  position: absolute;
-  right: 0.95rem;
-  color: #64748B;
-  pointer-events: none;
-}
-
-/* Time Picker Control Box (Input + AM/PM Segmented Switch) */
+/* Time Picker Control Box */
 .manual-time-picker-box {
   display: flex;
   align-items: center;
-  border: 1.5px solid #E2E8F0;
-  border-radius: 8px;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
   background: var(--bg-primary);
-  padding: 0.25rem 0.35rem 0.25rem 0.75rem;
-  transition: all 0.15s ease;
+  padding: 0.3rem 0.35rem 0.3rem 0.75rem;
+  transition: all var(--transition-fast);
 }
 
 .manual-time-picker-box:focus-within {
   border-color: var(--accent-primary);
-  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
-  background: #FFFFFF;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  background: var(--bg-secondary);
 }
 
 .time-inner-icon {
-  color: #94A3B8;
+  color: var(--text-secondary);
   flex-shrink: 0;
   margin-right: 0.4rem;
 }
@@ -582,15 +551,35 @@
 }
 
 .time-value-input::placeholder {
-  color: #CBD5E1;
-  font-weight: 400;
+  color: var(--text-secondary);
+  opacity: 0.6;
 }
 
-/* Segmented AM/PM Toggle */
+.watch-clock-btn {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem;
+  margin-right: 0.4rem;
+  border-radius: var(--radius-sm);
+  transition: all var(--transition-fast);
+}
+
+.watch-clock-btn:hover {
+  color: var(--accent-primary);
+  background: var(--bg-tertiary);
+}
+
+/* AM / PM Segmented Switch */
 .am-pm-segmented-switch {
   display: flex;
   align-items: center;
-  background: #F1F5F9;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
   border-radius: 6px;
   padding: 2px;
   gap: 2px;
@@ -603,82 +592,195 @@
   padding: 0.25rem 0.55rem;
   font-size: 0.75rem;
   font-weight: 700;
-  color: #64748B;
+  color: var(--text-secondary);
   border-radius: 4px;
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .period-btn.active {
-  background: #2563EB;
+  background: var(--accent-primary);
   color: #FFFFFF;
-  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.3);
+  box-shadow: 0 1px 3px rgba(37, 99, 235, 0.35);
 }
 
-/* ==========================================================================
-   FULL-WIDTH INLINE DASHBOARD VIEW FOR CREATE MANUAL RIDE
-   ========================================================================== */
-.manual-ride-fullpage-view {
-  width: 100%;
-  max-width: 1300px;
-  margin: 0 auto;
-  padding: 1.5rem 0;
-}
-
-.manual-view-header {
-  margin-bottom: 2rem;
-}
-
-.manual-view-form-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 2rem;
-  align-items: start;
-}
-
-.manual-view-column {
+/* Toggle Pills */
+.manual-toggle-pill {
   display: flex;
-  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.65rem 1rem;
+  background: var(--bg-primary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  transition: all var(--transition-fast);
+  user-select: none;
 }
 
+.manual-toggle-pill:hover {
+  border-color: var(--accent-primary);
+  background: var(--bg-tertiary);
+}
+
+.manual-toggle-pill.active {
+  border-color: var(--accent-primary);
+  background: var(--bg-secondary);
+}
+
+.switch-knob {
+  width: 38px;
+  height: 22px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: 20px;
+  position: relative;
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.switch-knob::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 16px;
+  height: 16px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.25);
+}
+
+.switch-knob.on {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.switch-knob.on::after {
+  transform: translateX(16px);
+}
+
+/* Publish to Driver Pool Card */
+.publish-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+}
+
+.publish-card-left h4 {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: 0.2rem;
+}
+
+.publish-card-left p {
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.main-toggle-switch {
+  width: 48px;
+  height: 28px;
+  background: var(--bg-tertiary);
+  border: 1.5px solid var(--border-color);
+  border-radius: 20px;
+  position: relative;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  flex-shrink: 0;
+}
+
+.main-toggle-switch .toggle-slider {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 19px;
+  height: 19px;
+  background: #FFFFFF;
+  border-radius: 50%;
+  transition: transform var(--transition-fast);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.25);
+}
+
+.main-toggle-switch.on {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+
+.main-toggle-switch.on .toggle-slider {
+  transform: translateX(20px);
+}
+
+/* Footer Actions Bar */
 .manual-view-footer-bar {
   grid-column: span 2;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 1rem;
-  margin-top: 1rem;
+  margin-top: 1.25rem;
   padding: 1.5rem 0;
   border-top: 1px solid var(--border-color);
 }
 
-.watch-clock-btn {
-  background: transparent;
-  border: none;
-  color: #64748B;
+.manual-cancel-btn {
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  font-weight: 700;
   cursor: pointer;
+  transition: all var(--transition-fast);
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 0.2rem;
-  margin-right: 0.4rem;
-  border-radius: 6px;
-  transition: all 0.15s ease;
 }
 
-.watch-clock-btn:hover {
-  color: #2563EB;
-  background: #EFF6FF;
+.manual-cancel-btn:hover {
+  background: var(--bg-tertiary);
+  border-color: var(--text-secondary);
+}
+
+.manual-submit-btn {
+  padding: 0.75rem 1.75rem;
+  background: var(--accent-primary);
+  color: #FFFFFF;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.92rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 14px rgba(59, 130, 246, 0.35);
+}
+
+.manual-submit-btn:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(59, 130, 246, 0.45);
 }
 
 /* ==========================================================================
-   INTERACTIVE WATCH / CLOCK MODAL STYLES
+   INTERACTIVE WATCH / CLOCK MODAL STYLES (DARK & LIGHT MODE)
    ========================================================================== */
 .watch-clock-modal-card {
   max-width: 420px !important;
   width: 90% !important;
-  border-radius: 20px !important;
-  background: #FFFFFF !important;
+  border-radius: var(--radius-xl) !important;
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-color) !important;
 }
 
 .watch-header-title {
@@ -706,9 +808,9 @@
   display: flex;
   align-items: baseline;
   gap: 0.6rem;
-  background: #F1F5F9;
-  border: 1px solid #E2E8F0;
-  border-radius: 12px;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
   padding: 0.75rem 2rem;
 }
 
@@ -716,19 +818,20 @@
   font-size: 2.25rem;
   font-weight: 800;
   font-family: monospace, sans-serif;
-  color: #0F172A;
+  color: var(--text-primary);
   letter-spacing: 1px;
 }
 
 .watch-period-tag {
   font-size: 1.1rem;
   font-weight: 800;
-  color: #2563EB;
+  color: var(--accent-primary);
 }
 
 .watch-period-toggle {
   display: flex;
-  background: #E2E8F0;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
   border-radius: 10px;
   padding: 3px;
   gap: 4px;
@@ -741,13 +844,13 @@
   border-radius: 8px;
   font-size: 0.88rem;
   font-weight: 800;
-  color: #64748B;
+  color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
 }
 
 .watch-toggle-btn.active {
-  background: #2563EB;
+  background: var(--accent-primary);
   color: #FFFFFF;
   box-shadow: 0 2px 6px rgba(37, 99, 235, 0.35);
 }
@@ -764,7 +867,7 @@
   font-size: 0.72rem;
   font-weight: 800;
   letter-spacing: 0.7px;
-  color: #64748B;
+  color: var(--text-secondary);
 }
 
 .watch-numbers-grid {
@@ -776,26 +879,26 @@
 
 .watch-num-btn {
   padding: 0.5rem 0.25rem;
-  border: 1px solid #E2E8F0;
-  background: #F8FAFC;
+  border: 1px solid var(--border-color);
+  background: var(--bg-primary);
   border-radius: 8px;
   font-size: 0.85rem;
   font-weight: 700;
-  color: #334155;
+  color: var(--text-primary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all var(--transition-fast);
   text-align: center;
 }
 
 .watch-num-btn:hover {
-  background: #EFF6FF;
-  border-color: #93C5FD;
-  color: #2563EB;
+  background: var(--bg-tertiary);
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
 }
 
 .watch-num-btn.active {
-  background: #2563EB;
-  border-color: #2563EB;
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
   color: #FFFFFF;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
 }

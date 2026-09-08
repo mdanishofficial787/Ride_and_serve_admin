@@ -2,11 +2,10 @@ import React, { useState } from 'react';
 import { 
   Search, Filter, MapPin, User, Car, Star, CheckCircle, ChevronRight 
 } from 'lucide-react';
-import { initialDrivers } from '../utils/mockData';
 import './DriverSelection.css';
 
 const DriverSelection = () => {
-  const [drivers, setDrivers] = useState(initialDrivers.filter(d => d.status === 'Approved'));
+  const [drivers, setDrivers] = useState([]);
   const [selectedDriver, setSelectedDriver] = useState(null);
   const [toastMessage, setToastMessage] = useState('');
 

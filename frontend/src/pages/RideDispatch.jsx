@@ -99,9 +99,9 @@ const normalizeRide = (r) => {
   const vAc = r.acPreference === 'AC' || r.acPreference === 'Yes' || (r.vehicle?.ac !== undefined ? r.vehicle.ac : (r.acRequired !== false));
   const vLabel = r.vehicle?.label || `${vCategory}${vAc ? ' • AC' : ' • Non-AC'}`;
 
-  const fareFmt = r.fareFormatted || (r.fare !== undefined && r.fare !== null ? (typeof r.fare === 'number' ? `AED ${r.fare}` : String(r.fare)) : 'Rs. 9,500');
+  const fareFmt = r.fareFormatted || (r.fare !== undefined && r.fare !== null ? (typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : String(r.fare)) : 'Rs. 4,500');
 
-  const isAssigned = r.status === 'ASSIGNED' || r.status === 'assigned' || (r.status && String(r.status).startsWith('Dispatched'));
+  const isAssigned = r.status === 'ASSIGNED' || r.status === 'assigned' || (r.status && String(r.status).startsWith('Dispatched')) || Boolean(r.assignedDriverDetails?.name && (r.driverId || r.driver));
   const statusStr = isAssigned ? 'ASSIGNED' : (r.status === 'Visible' || r.status === 'PENDING' || r.status === 'pending' ? 'Pending Dispatch' : (r.status || 'Pending Dispatch'));
 
   const realId = getDisplayId(r);
@@ -199,12 +199,12 @@ const RideDispatch = () => {
       // A) Primary: Fetch from http://192.168.88.132:3000/api/rides as requested
       try {
         const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 1500);
+        const tid = setTimeout(() => ctrl.abort(), 2500);
         const mobRes = await fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal });
         clearTimeout(tid);
         if (mobRes.ok) {
           const mobData = await mobRes.json();
-          const list = mobData.data?.rides || mobData.rides || (Array.isArray(mobData.data) ? mobData.data : (Array.isArray(mobData) ? mobData : []));
+          const list = mobData.data?.rides || mobData.rides || mobData.data?.requests || mobData.requests || (Array.isArray(mobData.data) ? mobData.data : (Array.isArray(mobData) ? mobData : []));
           if (Array.isArray(list) && list.length > 0) {
             combined.push(...list);
           }
@@ -216,12 +216,26 @@ const RideDispatch = () => {
         const dbRes = await fetch(`${ADMIN_5000}/api/rides`);
         if (dbRes.ok) {
           const dbData = await dbRes.json();
-          const list = dbData.data?.rides || dbData.rides || (Array.isArray(dbData.data) ? dbData.data : (Array.isArray(dbData) ? dbData : []));
+          const list = dbData.data?.rides || dbData.rides || dbData.data?.requests || dbData.requests || (Array.isArray(dbData.data) ? dbData.data : (Array.isArray(dbData) ? dbData : []));
           if (Array.isArray(list) && list.length > 0) {
             combined.push(...list);
           }
         }
       } catch (e) {}
+
+      // Fallback to /api/requests if needed
+      if (combined.length === 0) {
+        try {
+          const reqRes = await fetch(`${ADMIN_5000}/api/requests`);
+          if (reqRes.ok) {
+            const reqData = await reqRes.json();
+            const list = reqData.data?.requests || reqData.requests || (Array.isArray(reqData.data) ? reqData.data : []);
+            if (Array.isArray(list) && list.length > 0) {
+              combined.push(...list);
+            }
+          }
+        } catch (e) {}
+      }
 
       // C) Local port 3000 fallback
       if (combined.length === 0) {
@@ -229,7 +243,7 @@ const RideDispatch = () => {
           const res3000 = await fetch(`${LOCAL_3000}/api/rides`);
           if (res3000.ok) {
             const data3000 = await res3000.json();
-            const list = data3000.data?.rides || data3000.rides || (Array.isArray(data3000.data) ? data3000.data : (Array.isArray(data3000) ? data3000 : []));
+            const list = data3000.data?.rides || data3000.rides || data3000.data?.requests || data3000.requests || (Array.isArray(data3000.data) ? data3000.data : (Array.isArray(data3000) ? data3000 : []));
             if (Array.isArray(list) && list.length > 0) {
               combined.push(...list);
             }

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Outlet, NavLink } from 'react-router-dom';
 import { 
-  Users, Calendar, FileText, Settings, Bell, Search, Car, AlertCircle, LogOut, Sun, Moon, X 
+  Users, Calendar, FileText, Settings, Bell, Search, Car, AlertCircle, LogOut, Sun, Moon, X, KeyRound, Star 
 } from 'lucide-react';
 import './AdminLayout.css';
 
@@ -89,12 +89,18 @@ const AdminLayout = ({ user, onLogout, onUpdateUser }) => {
         </div>
         
         <nav className="sidebar-nav">
-          <div className="nav-category">APPROVALS</div>
+          <div className="nav-category">APPROVALS & SECURITY</div>
           <ul className="nav-list">
             <li className="nav-item">
               <NavLink to="/driver-approval" className={({isActive}) => isActive ? "nav-link active" : "nav-link"}>
                 <Users size={18} />
                 <span>Driver Approval</span>
+              </NavLink>
+            </li>
+            <li className="nav-item">
+              <NavLink to="/password-resets" className={({isActive}) => isActive ? "nav-link active" : "nav-link"}>
+                <KeyRound size={18} />
+                <span>Password Resets</span>
               </NavLink>
             </li>
           </ul>
@@ -105,6 +111,12 @@ const AdminLayout = ({ user, onLogout, onUpdateUser }) => {
               <NavLink to="/driver-selection" className={({isActive}) => isActive ? "nav-link active" : "nav-link"}>
                 <Car size={18} />
                 <span>Ride Dispatch</span>
+              </NavLink>
+            </li>
+            <li className="nav-item">
+              <NavLink to="/driver-rating" className={({isActive}) => isActive ? "nav-link active" : "nav-link"}>
+                <Star size={18} />
+                <span>Driver Rating</span>
               </NavLink>
             </li>
             <li className="nav-item">

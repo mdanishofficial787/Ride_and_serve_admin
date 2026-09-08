@@ -47,39 +47,14 @@ export const getRequests = async (req, res, next) => {
     const limitNum = parseInt(limit, 10) || 30;
     const skip = (pageNum - 1) * limitNum;
 
-    // Query both collections: customer mobile rides and manual admin requests
-    const rawRides = await RideDB.find({}, sort, 0, 100);
+    // Query requests collection for pool requests
     const rawRequests = await RequestDB.find(query, sort, skip, limitNum);
-
-    const formattedRides = (rawRides || []).map(formatRideRecord);
+    const total = await RequestDB.count(query);
     const formattedRequests = (rawRequests || []).map(formatRideRecord);
 
-    // Merge customer rides and requests, removing any duplicates by _id
-    const idMap = new Map();
-    [...formattedRides, ...formattedRequests].forEach(r => {
-      if (r && r._id) {
-        idMap.set(String(r._id), r);
-      }
-    });
-
-    let merged = Array.from(idMap.values());
-
-    if (search) {
-      const s = search.toLowerCase();
-      merged = merged.filter(r => 
-        (r.customerName && r.customerName.toLowerCase().includes(s)) ||
-        (r.pickupLocation && r.pickupLocation.toLowerCase().includes(s)) ||
-        (r.dropLocation && r.dropLocation.toLowerCase().includes(s)) ||
-        (r.requestId && r.requestId.toLowerCase().includes(s))
-      );
-    }
-
-    const total = merged.length;
-    const pagedRequests = merged.slice(skip, skip + limitNum);
-
     return sendSuccess(res, {
-      requests: pagedRequests,
-      rides: pagedRequests,
+      requests: formattedRequests,
+      rides: formattedRequests,
       pagination: {
         total,
         page: pageNum,

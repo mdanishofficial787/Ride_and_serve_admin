@@ -1,10 +1,10 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { 
   AlertCircle, Clock, CheckCircle, CreditCard, BellRing, 
   Car, User, Settings2, AlertTriangle, ChevronDown, ChevronUp, 
   X, ShieldAlert, UserPlus, Check, RefreshCw
 } from 'lucide-react';
-import { pendingRidesData } from '../utils/mockData';
+import { BACKEND_URL, RideAPI } from '../utils/api';
 import './PendingRides.css';
 
 const STATUS_FILTERS = [
@@ -26,12 +26,48 @@ const REJECTION_REASONS = [
 ];
 
 const PendingRides = () => {
-  const [rides, setRides] = useState(pendingRidesData);
+  const [rides, setRides] = useState([]);
   const [activeFilter, setActiveFilter] = useState('All');
   const [toastMessage, setToastMessage] = useState('');
   const [toastType, setToastType] = useState('success');
   const [expandedRowId, setExpandedRowId] = useState(null);
   const [removingId, setRemovingId] = useState(null);
+
+  const fetchPendingRides = async () => {
+    try {
+      let res = await fetch(`${BACKEND_URL}/api/ride/pending`).catch(() => null);
+      if (!res || !res.ok) {
+        res = await fetch(`${BACKEND_URL}/api/requests/pending`);
+      }
+      const data = await res.json();
+      const rawList = data.data?.rides || data.data?.requests || (Array.isArray(data.data) ? data.data : (data.rides || []));
+      if (data.success && rawList.length > 0) {
+        const mapped = rawList.map(r => ({
+          _id: r._id,
+          id: r.requestId || r.rideId || r._id,
+          passenger: r.customerName || r.passengerName || r.passenger?.name || 'Passenger',
+          route: typeof r.route === 'object' && r.route?.summary ? r.route.summary : `${r.pickupLocation} -> ${r.dropLocation || r.dropoffLocation}`,
+          date: `${r.date || ''} ${r.timeToLeave || ''}`.trim() || r.scheduledTime || 'Today',
+          driver: r.assignedDriverDetails?.name || null,
+          fare: r.fareFormatted || r.fare || 'Rs. 8,500',
+          status: r.status,
+          isOverdue: r.isOverdue || false,
+          lastUpdated: 'Just now',
+          notes: r.notes || ''
+        }));
+        setRides(mapped);
+      }
+    } catch (err) {
+      console.error('Failed to fetch pending rides:', err);
+    }
+  };
+
+  useEffect(() => {
+    fetchPendingRides();
+    const interval = setInterval(fetchPendingRides, 5000);
+    return () => clearInterval(interval);
+  }, []);
+
 
   // Rejection / Investigation Modal State
   const [modalState, setModalState] = useState({
@@ -118,10 +154,23 @@ const PendingRides = () => {
     );
   };
 
-  const handleAssignSubmit = (e) => {
+  const handleAssignSubmit = async (e) => {
     e.preventDefault();
     if (!assignModal.ride) return;
     const { ride, selectedDriver } = assignModal;
+    const targetRideId = ride._id || ride.id;
+    // Extract driver ID if code string (e.g. DRV-1001 from 'DRV-1001 (Ahmed Khan - Toyota Corolla)')
+    const driverIdMatch = selectedDriver.match(/DRV-[0-9]+/i);
+    const targetDriverId = driverIdMatch ? driverIdMatch[0] : selectedDriver;
+
+    try {
+      await RideAPI.assign(targetRideId, targetDriverId, {
+        remarks: `Manually Assigned to ${selectedDriver}`
+      });
+    } catch (err) {
+      console.warn('Assign API warning:', err);
+    }
+
     setAssignModal({ isOpen: false, ride: null, selectedDriver: '' });
     executeAction(
       ride.id,

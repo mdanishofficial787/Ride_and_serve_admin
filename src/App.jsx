@@ -3,8 +3,11 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import AdminLayout from './layouts/AdminLayout';
 import DriverApproval from './pages/DriverApproval';
 import RideDispatch from './pages/RideDispatch';
+import AdminRideDispatch from './pages/AdminRideDispatch';
 import RidePool from './pages/RidePool';
 import PendingRides from './pages/PendingRides';
+import PasswordResetRequests from './pages/PasswordResetRequests';
+import DriverRating from './pages/DriverRating';
 import AuthPage from './pages/AuthPage';
 import './App.css';
 
@@ -12,14 +15,19 @@ function App() {
   const [user, setUser] = useState(() => {
     try {
       const saved = localStorage.getItem('rr_current_user');
-      return saved ? JSON.parse(saved) : { name: 'sohaib', email: 'sohaib@rrdispatcher.com' };
+      const token = localStorage.getItem('admin_token');
+      if (saved && token) {
+        return JSON.parse(saved);
+      }
+      return null;
     } catch (e) {
-      return { name: 'sohaib', email: 'sohaib@rrdispatcher.com' };
+      return null;
     }
   });
 
   const handleLogout = () => {
     localStorage.removeItem('rr_current_user');
+    localStorage.removeItem('admin_token');
     setUser(null);
   };
 
@@ -38,7 +46,10 @@ function App() {
         <Route path="/" element={<AdminLayout user={user} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />}>
           <Route index element={<Navigate to="/pending-rides" replace />} />
           <Route path="driver-approval" element={<DriverApproval />} />
+          <Route path="password-resets" element={<PasswordResetRequests />} />
           <Route path="driver-selection" element={<RideDispatch />} />
+          <Route path="admin-dispatch" element={<AdminRideDispatch />} />
+          <Route path="driver-rating" element={<DriverRating />} />
           <Route path="ride-pool" element={<RidePool />} />
           <Route path="pending-rides" element={<PendingRides />} />
         </Route>
