@@ -209,11 +209,44 @@ export const RideAPI = {
     return request(`/ride/pending${query ? `?${query}` : ''}`);
   },
 
-  // POST /api/ride/assign - Assign selected driver to ride
-  assign: (rideId, driverId, extraData = {}) => request('/ride/assign', {
-    method: 'POST',
-    body: JSON.stringify({ rideId, driverId, ...extraData })
-  }),
+  // POST /api/ride/assign - Assign selected driver to ride (Flutter App Integration)
+  assign: async (rideId, driverId, extraData = {}) => {
+    const payload = { rideId, driverId, ...extraData };
+
+    // 1. Try port 3000 POST /api/ride/assign with quick abort
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 1200);
+      const res3000 = await fetch('http://localhost:3000/api/ride/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      if (res3000.ok) {
+        return await res3000.json();
+      }
+    } catch (e) {}
+
+    // 2. Try main backend POST /api/ride/assign
+    try {
+      const res = await fetch(`${BACKEND_URL}/api/ride/assign`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload)
+      });
+      if (res.ok) {
+        return await res.json();
+      }
+    } catch (e) {}
+
+    // 3. Fallback to POST /api/assignments
+    return request('/assignments', {
+      method: 'POST',
+      body: JSON.stringify({ requestId: rideId, driverId, ...extraData })
+    });
+  },
 
   // GET /api/ride/assigned - Fetch all assigned rides
   getAssigned: (params = {}) => {

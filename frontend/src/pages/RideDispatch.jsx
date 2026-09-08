@@ -258,14 +258,16 @@ const RideDispatch = () => {
     }
   };
 
-  // Handle Dispatch via PATCH /api/rides/:id/dispatch
+  // Handle Dispatch via POST /api/ride/assign (and PATCH /api/rides/:id/dispatch)
   const handleDispatch = async (driver) => {
     const rideId = selectedRide._id || selectedRide.id;
     const driverId = driver._id || driver.id;
     const driverName = driver.personalInfo?.name || driver.name || 'Ali Khan';
 
     try {
-      // Call live backend PATCH http://localhost:3000/api/rides/:id/dispatch with { "driverName": "Ali Khan" }
+      // 1. Primary: POST /api/ride/assign { rideId, driverId }
+      await RideAPI.assign(rideId, driverId, { driverName });
+      // 2. Dual fallback: PATCH /api/rides/:id/dispatch
       await RideAPI.dispatch(rideId, driverName, driverId);
     } catch (err) {
       console.error('Dispatch API error:', err);
@@ -857,7 +859,7 @@ const RideDispatch = () => {
                         className={`dispatch-btn ${isTopMatch ? 'highlight-btn' : ''}`} 
                         onClick={() => handleDispatch(driver)}
                       >
-                        <Sparkles size={14} /> Dispatch Driver
+                        <Sparkles size={14} /> Confirm Assignment
                       </button>
                     </div>
                   </div>
