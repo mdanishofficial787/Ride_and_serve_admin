@@ -193,77 +193,23 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // Fetch live rides from backend API on host laptop (http://192.168.88.132:3000/api/rides)
-  const fetchRides = useCallback(async () => {
+  // 1. Data fetching from http://192.168.88.132:3000/api/rides
+  const loadRides = useCallback(async () => {
     try {
       const res = await fetch('http://192.168.88.132:3000/api/rides');
       const data = await res.json();
-      const rawList = (data.success && Array.isArray(data.data)) 
-        ? data.data 
-        : (Array.isArray(data.data) ? data.data : (data.data?.rides || data.rides || (Array.isArray(data) ? data : [])));
-
-      if (Array.isArray(rawList)) {
-        const mappedRides = rawList.map(item => {
-          const vCat = item.vehicleType || item.vehicle?.type || item.preferences?.vehicleCategory || item.vehiclePreference || 'Sedan';
-          const acReq = (item.acPreference || item.vehicle?.ac || (item.preferences?.acRequired !== false) || 'AC').toString().toUpperCase().includes('AC');
-          const fareStr = item.fareFormatted || (item.fare ? `Rs. ${Number(item.fare).toLocaleString()}` : 'Rs. 9,500');
-          const pName = item.passengerName || item.passenger?.name || item.customerName || 'Customer';
-          const pPhone = item.passengerPhone || item.passenger?.phone || item.customerPhone || '';
-          const pickup = typeof item.pickupLocation === 'object' ? (item.pickupLocation.address || '') : (item.pickupLocation || '');
-          const dropoff = typeof item.dropoffLocation === 'object' ? (item.dropoffLocation.address || '') : (item.dropoffLocation || item.dropLocation || '');
-          const routeStr = item.route?.summary || `${pickup} -> ${dropoff}`;
-          const timeStr = item.scheduledTime || `${item.startingFrom || ''} ${item.timeToReach || ''}`.trim() || item.date || 'Today';
-          const realId = item.requestId || item.id || (item._id ? (String(item._id).startsWith('REQ-') ? item._id : `REQ-${String(item._id).slice(-4).toUpperCase()}`) : 'REQ-8001');
-
-          return {
-            id: item.requestId || item.id || item._id,
-            mongoId: item.mongoId || item._id,
-            displayId: realId,
-            requestId: realId,
-            rideId: realId,
-            rawId: item.requestId || item.id || item._id,
-            _id: item.mongoId || item._id || realId,
-            passenger: pName,
-            passengerName: pName,
-            phone: pPhone,
-            passengerPhone: pPhone,
-            customerName: pName,
-            customerPhone: pPhone,
-            route: {
-              summary: routeStr,
-              pickup: pickup,
-              dropoff: dropoff,
-              pickupLocation: pickup,
-              dropLocation: dropoff,
-              passengers: item.route?.passengers || `${item.seatsNeeded || 1} Passenger(s)`
-            },
-            pickupLocation: pickup,
-            dropoffLocation: dropoff,
-            dropLocation: dropoff,
-            date: timeStr,
-            scheduledTime: timeStr,
-            fare: fareStr,
-            fareFormatted: fareStr,
-            status: item.status || 'Pending Dispatch',
-            vehicleType: vCat,
-            acPreference: acReq ? 'AC' : 'Non-AC',
-            vehicle: {
-              label: `${vCat} • ${acReq ? 'AC' : 'Non-AC'}`,
-              category: vCat,
-              ac: acReq
-            },
-            preferences: {
-              vehicleCategory: vCat,
-              acRequired: acReq
-            },
-            assignedDriverDetails: item.assignedDriverDetails,
-            driverId: item.driverId || item.driver
-          };
-        });
-        setRideRequests(mappedRides);
+      if (data.success && Array.isArray(data.data)) {
+        // Set all rides directly into state without strict string filter
+        setRideRequests(data.data);
+      } else if (Array.isArray(data.data?.rides)) {
+        setRideRequests(data.data.rides);
+      } else if (Array.isArray(data.rides)) {
+        setRideRequests(data.rides);
+      } else if (Array.isArray(data)) {
+        setRideRequests(data);
       }
     } catch (err) {
-      console.error("Error fetching live rides from backend:", err);
+      console.error('Fetch error:', err);
     } finally {
       setLoading(false);
     }
@@ -331,7 +277,7 @@ const RideDispatch = () => {
 
   // 3. Permanent Live Fetch & Polling (Every 3 seconds)
   useEffect(() => {
-    fetchRides();
+    loadRides();
     fetchDrivers();
 
     let socket = null;
@@ -347,25 +293,34 @@ const RideDispatch = () => {
         socket.emit('join-admin');
       });
 
-      socket.on('new-ride', () => fetchRides());
-      socket.on('ride-dispatched', () => fetchRides());
-      socket.on('ride-update', () => fetchRides());
+      socket.on('new-ride', () => loadRides());
+      socket.on('ride-dispatched', () => loadRides());
+      socket.on('ride-update', () => loadRides());
     } catch (e) {}
 
-    const timer = setInterval(fetchRides, 3000);
+    const timer = setInterval(loadRides, 3000);
     return () => {
       if (socket) socket.disconnect();
       clearInterval(timer);
     };
-  }, [fetchRides, fetchDrivers]);
+  }, [loadRides, fetchDrivers]);
 
   // Split pending vs assigned rides
+  // In Ride Dispatch (/driver-selection), do NOT filter out rides with status "Pending Dispatch"
+  // Include all rides where status is "Pending Dispatch" or status is not ASSIGNED
   const pendingRides = useMemo(() => {
-    return rides.filter(r => r.status !== 'ASSIGNED' && !String(r.status).startsWith('Dispatched'));
+    return rides.filter(r => {
+      const s = String(r.status || '').trim();
+      if (s === 'Pending Dispatch' || s.toLowerCase().includes('pending') || s === 'Visible' || s === '') return true;
+      return s.toUpperCase() !== 'ASSIGNED' && !s.toUpperCase().startsWith('DISPATCHED');
+    });
   }, [rides]);
 
   const assignedRides = useMemo(() => {
-    return rides.filter(r => r.status === 'ASSIGNED' || String(r.status).startsWith('Dispatched'));
+    return rides.filter(r => {
+      const s = String(r.status || '').trim().toUpperCase();
+      return s === 'ASSIGNED' || s.startsWith('DISPATCHED');
+    });
   }, [rides]);
 
   const pendingCount = pendingRides.length;
@@ -627,8 +582,8 @@ const RideDispatch = () => {
                     >
                       {/* REQUEST ID */}
                       <td>
-                        <span className="id-pill font-mono" title={ride.rawId}>
-                          {ride.displayId}
+                        <span className="id-pill font-mono" title={ride.requestId || ride.id || ride.displayId}>
+                          {ride.requestId || ride.id || ride.displayId || 'REQ-8011'}
                         </span>
                       </td>
 
@@ -636,11 +591,11 @@ const RideDispatch = () => {
                       <td>
                         <div className="passenger-table-cell">
                           <div className="avatar-circle">
-                            {(ride.passengerName || 'C').charAt(0).toUpperCase()}
+                            {(ride.passengerName || ride.passenger?.name || 'C').charAt(0).toUpperCase()}
                           </div>
                           <div className="passenger-info-col">
-                            <strong className="passenger-name-text">{ride.passengerName}</strong>
-                            <div className="passenger-phone-text">{ride.passengerPhone}</div>
+                            <strong className="passenger-name-text">{ride.passengerName || ride.passenger?.name || 'Customer'}</strong>
+                            <div className="passenger-phone-text">{ride.passengerPhone || ride.passenger?.phone || ride.phone || ''}</div>
                           </div>
                         </div>
                       </td>
@@ -650,14 +605,14 @@ const RideDispatch = () => {
                         <div className="route-cell-box">
                           <div className="route-line-row">
                             <span className="dot green-dot"></span>
-                            <span className="route-address-text" title={ride.pickupLocation}>
-                              {ride.pickupLocation}
+                            <span className="route-address-text" title={typeof ride.pickupLocation === 'object' ? (ride.pickupLocation?.address || '') : (ride.pickupLocation || '')}>
+                              {typeof ride.pickupLocation === 'object' ? (ride.pickupLocation?.address || '') : (ride.pickupLocation || (ride.route?.summary ? ride.route.summary.split('->')[0]?.trim() : 'Pickup Location'))}
                             </span>
                           </div>
                           <div className="route-line-row mt-1">
                             <span className="dot red-dot"></span>
-                            <span className="route-address-text font-semibold" title={ride.dropoffLocation || ride.dropLocation}>
-                              {ride.dropoffLocation || ride.dropLocation}
+                            <span className="route-address-text font-semibold" title={typeof ride.dropoffLocation === 'object' ? (ride.dropoffLocation?.address || '') : (ride.dropoffLocation || ride.dropLocation || '')}>
+                              {typeof ride.dropoffLocation === 'object' ? (ride.dropoffLocation?.address || '') : (ride.dropoffLocation || ride.dropLocation || (ride.route?.summary ? ride.route.summary.split('->')[1]?.trim() : 'Drop-off Location'))}
                             </span>
                           </div>
                         </div>
@@ -667,26 +622,26 @@ const RideDispatch = () => {
                       <td>
                         <div className="d-flex align-items-center gap-1.5 text-xs text-secondary">
                           <Clock size={13} className="text-primary flex-shrink-0" />
-                          <span>{ride.scheduledTime}</span>
+                          <span>{ride.scheduledTime || `${ride.startingFrom || ''} ${ride.timeToReach || ''}`.trim() || ride.date || 'Today'}</span>
                         </div>
                       </td>
 
                       {/* VEHICLE & AC */}
                       <td>
                         <div className="vehicle-pill">
-                          <span>{ride.vehicle?.label || `${ride.vehicleType || 'Sedan'} • ${ride.acPreference || 'AC'}`}</span>
+                          <span>{ride.vehicle?.label || (ride.vehicleType ? `${ride.vehicleType} • ${ride.acPreference || 'AC'}` : (ride.preferences?.vehicleCategory ? `${ride.preferences.vehicleCategory} • ${ride.preferences?.acRequired ? 'AC' : 'Non-AC'}` : 'Sedan • AC'))}</span>
                         </div>
                       </td>
 
                       {/* FARE */}
                       <td>
-                        <span className="fare-badge">{ride.fareFormatted || ride.fare}</span>
+                        <span className="fare-badge">{ride.fareFormatted || (ride.fare ? (String(ride.fare).startsWith('Rs.') ? ride.fare : `Rs. ${ride.fare}`) : 'Rs. 9,500')}</span>
                       </td>
 
                       {/* STATUS */}
                       <td>
-                        <span className={`status-badge ${String(ride.status).toLowerCase().includes('pending') ? 'pending' : 'approved'}`}>
-                          {ride.status}
+                        <span className={`status-badge ${String(ride.status || '').toLowerCase().includes('pending') ? 'pending' : 'approved'}`}>
+                          {ride.status || 'Pending Dispatch'}
                         </span>
                       </td>
 
@@ -731,38 +686,38 @@ const RideDispatch = () => {
                 onClick={() => handleSelectRide(ride)}
               >
                 <div className="ride-card-header">
-                  <span className="id-pill font-mono">{ride.displayId}</span>
-                  <span className={`status-badge ${String(ride.status).toLowerCase().includes('pending') ? 'pending' : 'approved'}`}>
-                    {ride.status}
+                  <span className="id-pill font-mono">{ride.requestId || ride.id || ride.displayId || 'REQ-8011'}</span>
+                  <span className={`status-badge ${String(ride.status || '').toLowerCase().includes('pending') ? 'pending' : 'approved'}`}>
+                    {ride.status || 'Pending Dispatch'}
                   </span>
                 </div>
                 
                 <div className="ride-card-body">
                   <div className="passenger-row mb-2">
                     <User size={15} className="text-primary" />
-                    <strong>{ride.passengerName}</strong>
-                    <span className="text-secondary text-xs">({ride.passengerPhone})</span>
+                    <strong>{ride.passengerName || ride.passenger?.name || 'Customer'}</strong>
+                    <span className="text-secondary text-xs">({ride.passengerPhone || ride.passenger?.phone || ride.phone || ''})</span>
                   </div>
                   <div className="ride-info">
                     <MapPin size={15} className="text-success" />
-                    <span className="text-xs font-semibold">{ride.pickupLocation}</span>
+                    <span className="text-xs font-semibold">{typeof ride.pickupLocation === 'object' ? (ride.pickupLocation?.address || '') : (ride.pickupLocation || (ride.route?.summary ? ride.route.summary.split('->')[0]?.trim() : 'Pickup'))}</span>
                   </div>
                   <div className="ride-info">
                     <MapPin size={15} className="text-danger" />
-                    <span className="text-xs font-semibold">{ride.dropoffLocation || ride.dropLocation}</span>
+                    <span className="text-xs font-semibold">{typeof ride.dropoffLocation === 'object' ? (ride.dropoffLocation?.address || '') : (ride.dropoffLocation || ride.dropLocation || (ride.route?.summary ? ride.route.summary.split('->')[1]?.trim() : 'Drop-off'))}</span>
                   </div>
                   <div className="ride-info">
                     <Clock size={15} className="text-secondary" />
-                    <span className="text-xs">{ride.scheduledTime}</span>
+                    <span className="text-xs">{ride.scheduledTime || `${ride.startingFrom || ''} ${ride.timeToReach || ''}`.trim() || ride.date || 'Today'}</span>
                   </div>
                   <div className="ride-info">
                     <Car size={15} className="text-secondary" />
-                    <span className="text-xs">{ride.vehicle?.label || `${ride.vehicleType || 'Sedan'} • ${ride.acPreference || 'AC'}`}</span>
+                    <span className="text-xs">{ride.vehicle?.label || (ride.vehicleType ? `${ride.vehicleType} • ${ride.acPreference || 'AC'}` : (ride.preferences?.vehicleCategory ? `${ride.preferences.vehicleCategory} • ${ride.preferences?.acRequired ? 'AC' : 'Non-AC'}` : 'Sedan • AC'))}</span>
                   </div>
                 </div>
 
                 <div className="ride-card-footer">
-                  <span className="fare-text">{ride.fareFormatted || ride.fare}</span>
+                  <span className="fare-text">{ride.fareFormatted || (ride.fare ? (String(ride.fare).startsWith('Rs.') ? ride.fare : `Rs. ${ride.fare}`) : 'Rs. 9,500')}</span>
                   <button 
                     className="primary-btn sm-btn" 
                     onClick={(e) => {
