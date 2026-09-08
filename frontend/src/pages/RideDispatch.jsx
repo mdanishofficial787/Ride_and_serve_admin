@@ -557,214 +557,282 @@ const RideDispatch = () => {
     </div>
   );
 
-  // View 2: Driver Selection Screen with Smart Recommendations
+  // View 2: Driver Selection Screen with Smart Recommendations (Full-width Top Search & Filters)
   const renderDriverSelection = () => (
     <div className="driver-selection-container fade-in">
-      <div className="page-header dispatch-selection-header">
+      {/* Top Header */}
+      <div className="page-header dispatch-selection-header mb-3">
         <div className="d-flex align-items-center gap-3">
           <button className="back-btn" onClick={() => setSelectedRide(null)}>
             <ChevronLeft size={18} />
             <span>Back to Requests</span>
           </button>
           <div>
-            <h1 className="page-title">Smart Driver Dispatch</h1>
-            <p className="page-subtitle">Matching passenger <strong>{selectedRide.passenger}</strong> with top compatible drivers</p>
+            <h1 className="page-title">Smart Driver Dispatch Console</h1>
+            <p className="page-subtitle">Matching passenger <strong>{selectedRide.passenger}</strong> with top compatible verified drivers</p>
           </div>
         </div>
       </div>
 
-      <div className="selection-layout">
-        <div className="selection-sidebar">
-          <div className="glass-panel summary-panel">
-            <div className="d-flex justify-content-between align-items-center mb-2">
-              <h3 style={{ fontSize: '1rem', fontWeight: '700' }}>Trip Summary</h3>
-              <span className="fare-badge">{selectedRide.fare}</span>
-            </div>
-            
-            <div className="passenger-mini-card mb-3">
-              <User size={16} className="text-primary" />
-              <div>
-                <strong style={{ fontSize: '0.88rem' }}>{selectedRide.passenger}</strong>
-                <div className="text-xs text-secondary">{selectedRide.phone}</div>
-              </div>
-            </div>
+      {/* Top Horizontal Trip Summary Banner */}
+      <div className="dispatch-trip-banner glass-panel mb-3">
+        <div className="trip-banner-passenger">
+          <div className="passenger-avatar-box">
+            {selectedRide.passenger.charAt(0)}
+          </div>
+          <div>
+            <div className="text-xs text-secondary">PASSENGER</div>
+            <strong className="passenger-name-text">{selectedRide.passenger}</strong>
+            <div className="text-xs text-secondary mt-0.5">{selectedRide.phone}</div>
+          </div>
+        </div>
 
-            <div className="summary-route">
-              <MapPin size={16} className="text-primary" />
-              <div>
-                <div className="text-xs text-secondary">PICKUP:</div>
-                <strong style={{ fontSize: '0.85rem' }}>{selectedRide.pickupLocation}</strong>
-                <div className="text-xs text-secondary mt-1">DROP-OFF:</div>
-                <strong style={{ fontSize: '0.85rem' }}>{selectedRide.dropLocation}</strong>
-              </div>
+        <div className="trip-banner-divider"></div>
+
+        <div className="trip-banner-route">
+          <div className="route-banner-step">
+            <span className="dot green-dot"></span>
+            <div>
+              <span className="step-label">PICKUP</span>
+              <strong className="step-val">{selectedRide.pickupLocation}</strong>
             </div>
           </div>
-
-          <div className="glass-panel filter-panel">
-            <div className="filter-header">
-              <Filter size={16} />
-              <h3>Driver Search & Filters</h3>
-            </div>
-            
-            <div className="filter-group">
-              <label>Search Driver (Name/Phone/Plate)</label>
-              <div className="search-input-wrapper">
-                <Search size={15} className="search-icon" />
-                <input 
-                  type="text" 
-                  value={driverSearchQuery}
-                  onChange={(e) => setDriverSearchQuery(e.target.value)}
-                  placeholder="e.g. Abbas, Bolan, ISB-123..."
-                />
-              </div>
-            </div>
-
-            <div className="filter-group">
-              <label>Vehicle Category</label>
-              <select value={filterCategory} onChange={(e) => setFilterCategory(e.target.value)}>
-                <option value="all">Any Category</option>
-                <option value="Sedan">Sedan</option>
-                <option value="SUV">SUV</option>
-                <option value="Hatchback">Hatchback</option>
-                <option value="Van">Van / Bolan</option>
-              </select>
-            </div>
-
-            <div className="filter-group">
-              <label>Air Conditioning (AC)</label>
-              <div className="radio-group">
-                <button 
-                  type="button"
-                  className={`radio-btn ${filterAC === 'all' ? 'active' : ''}`}
-                  onClick={() => setFilterAC('all')}
-                >All</button>
-                <button 
-                  type="button"
-                  className={`radio-btn ${filterAC === 'ac' ? 'active' : ''}`}
-                  onClick={() => setFilterAC('ac')}
-                >AC Only</button>
-                <button 
-                  type="button"
-                  className={`radio-btn ${filterAC === 'non-ac' ? 'active' : ''}`}
-                  onClick={() => setFilterAC('non-ac')}
-                >Non-AC</button>
-              </div>
+          <div className="route-banner-arrow">➔</div>
+          <div className="route-banner-step">
+            <span className="dot red-dot"></span>
+            <div>
+              <span className="step-label">DROP-OFF</span>
+              <strong className="step-val">{selectedRide.dropLocation}</strong>
             </div>
           </div>
         </div>
 
-        <div className="driver-results-area">
-          <div className="results-header">
-            <div>
-              <h2>Smart Recommended Drivers</h2>
-              <p className="text-secondary text-xs">Sorted by Route Compatibility, AC Capability & Proximity</p>
-            </div>
-            <span className="results-count">{scoredDrivers.length} Candidates Found</span>
+        <div className="trip-banner-divider"></div>
+
+        <div className="trip-banner-specs">
+          <div className="d-flex align-items-center gap-2">
+            <Clock size={15} className="text-primary" />
+            <span>{selectedRide.date}</span>
           </div>
+          <div className="d-flex align-items-center gap-2 mt-1">
+            <Car size={15} className="text-primary" />
+            <span>{selectedRide.preferences.vehicleCategory} • {selectedRide.preferences.acRequired ? 'AC Required' : 'Non-AC'}</span>
+          </div>
+        </div>
 
-          {scoredDrivers.length === 0 ? (
-            <div className="empty-state glass-panel">
-              <Car size={44} className="text-secondary mb-3" />
-              <h3>No Suitable Drivers Found</h3>
-              <p>No available drivers match your current filter preferences.</p>
-              <button className="outline-btn mt-3" onClick={() => {
-                setDriverSearchQuery('');
-                setFilterAC('all');
-                setFilterCategory('all');
-              }}>Reset Search Criteria</button>
-            </div>
-          ) : (
-            <div className="drivers-list">
-              {scoredDrivers.map((driver, index) => {
-                const isTopMatch = index === 0;
-                const assignedTrips = getDriverAssignedTrips(driver);
-                return (
-                  <div 
-                    key={driver.id} 
-                    className={`glass-panel driver-match-card ${isTopMatch ? 'top-recommended-card' : ''}`}
-                  >
-                    {isTopMatch && (
-                      <div className="top-match-badge">
-                        <Sparkles size={13} /> Top Recommended Match ({driver.matchScore}% Match Score)
-                      </div>
-                    )}
+        <div className="trip-banner-fare ms-auto">
+          <span className="fare-label">Estimated Fare</span>
+          <span className="fare-amount font-bold text-success">{selectedRide.fare}</span>
+        </div>
+      </div>
 
-                    <div className="driver-card-inner">
-                      <div className="driver-match-main">
-                        <div className="driver-avatar-lg">
+      {/* Top Horizontal Search & Filters Toolbar */}
+      <div className="dispatch-filters-toolbar glass-panel mb-4">
+        <div className="search-input-wrapper flex-1">
+          <Search size={16} className="search-icon" />
+          <input 
+            type="text" 
+            value={driverSearchQuery}
+            onChange={(e) => setDriverSearchQuery(e.target.value)}
+            placeholder="Search recommended driver by name, phone, plate number, or vehicle model..."
+          />
+        </div>
+
+        <div className="toolbar-filter-item">
+          <select 
+            value={filterCategory} 
+            onChange={(e) => setFilterCategory(e.target.value)}
+            className="toolbar-select"
+          >
+            <option value="all">All Vehicle Categories</option>
+            <option value="Sedan">Sedan</option>
+            <option value="SUV">SUV</option>
+            <option value="Hatchback">Hatchback</option>
+            <option value="Van">Van / Bolan</option>
+          </select>
+        </div>
+
+        <div className="toolbar-filter-item">
+          <div className="radio-group toolbar-radios">
+            <button 
+              type="button"
+              className={`radio-btn ${filterAC === 'all' ? 'active' : ''}`}
+              onClick={() => setFilterAC('all')}
+            >All AC</button>
+            <button 
+              type="button"
+              className={`radio-btn ${filterAC === 'ac' ? 'active' : ''}`}
+              onClick={() => setFilterAC('ac')}
+            >AC Only</button>
+            <button 
+              type="button"
+              className={`radio-btn ${filterAC === 'non-ac' ? 'active' : ''}`}
+              onClick={() => setFilterAC('non-ac')}
+            >Non-AC</button>
+          </div>
+        </div>
+
+        {(driverSearchQuery || filterAC !== 'all' || filterCategory !== 'all') && (
+          <button 
+            type="button"
+            className="clear-filters-btn" 
+            onClick={() => {
+              setDriverSearchQuery('');
+              setFilterAC('all');
+              setFilterCategory('all');
+            }}
+          >
+            <RotateCcw size={13} /> Reset Filters
+          </button>
+        )}
+      </div>
+
+      {/* Recommended Drivers Section */}
+      <div className="dispatch-results-container">
+        <div className="results-header mb-3">
+          <div>
+            <h2 style={{ fontSize: '1.15rem', fontWeight: '700' }}>Smart Recommended Drivers</h2>
+            <p className="text-secondary text-xs">Ranked by Route Compatibility, Vehicle Match, Rating & Proximity</p>
+          </div>
+          <span className="results-count">{scoredDrivers.length} Candidates Available</span>
+        </div>
+
+        {scoredDrivers.length === 0 ? (
+          <div className="empty-state glass-panel">
+            <Car size={44} className="text-secondary mb-3" />
+            <h3>No Suitable Drivers Found</h3>
+            <p>No available drivers match your current filter preferences.</p>
+            <button className="outline-btn mt-3" onClick={() => {
+              setDriverSearchQuery('');
+              setFilterAC('all');
+              setFilterCategory('all');
+            }}>Reset Search Criteria</button>
+          </div>
+        ) : (
+          <div className="drivers-list">
+            {scoredDrivers.map((driver, index) => {
+              const isTopMatch = index === 0;
+              const assignedTrips = getDriverAssignedTrips(driver);
+              const isOnTrip = assignedTrips.length > 0;
+
+              return (
+                <div 
+                  key={driver.id} 
+                  className={`driver-recommendation-card glass-panel ${isTopMatch ? 'top-recommended-card' : ''}`}
+                >
+                  {isTopMatch && (
+                    <div className="top-match-badge">
+                      <Sparkles size={13} /> Top Recommended Match ({driver.matchScore}% Match Score)
+                    </div>
+                  )}
+
+                  {/* Card Main Body */}
+                  <div className="rec-card-body">
+                    {/* Left: Driver Avatar & Basic Info */}
+                    <div className="rec-driver-profile">
+                      <div className="rec-avatar-wrapper">
+                        <div className="rec-driver-avatar">
                           {(driver.personalInfo?.name || 'D').charAt(0).toUpperCase()}
                         </div>
-                        <div className="driver-match-info">
-                          <div className="driver-match-title-row">
-                            <h4>{driver.personalInfo?.name || 'Driver'}</h4>
-                            <span className="driver-id-pill font-mono" title={driver.id}>
-                              {formatDriverCode(driver.id)}
-                            </span>
-                            {assignedTrips.length > 0 && (
-                              <span className="active-dispatch-tag">
-                                ⚡ {assignedTrips.length} Active Trip
-                              </span>
-                            )}
-                          </div>
-                          <p className="driver-car">
-                            {driver.vehicleInfo.make} {driver.vehicleInfo.model} • {driver.vehicleInfo.color} ({driver.vehicleInfo.plateNumber})
-                          </p>
-                          <div className="driver-tags">
-                            <span className="tag category-tag">{driver.vehicleInfo.category}</span>
-                            {driver.vehicleInfo.ac ? (
-                              <span className="tag ac-tag"><Wind size={11} /> AC Fitted</span>
-                            ) : (
-                              <span className="tag non-ac-tag">Non-AC</span>
-                            )}
-                            <span className="tag seats-tag">{driver.vehicleInfo.seats} Seats</span>
-                          </div>
-                          <div className="match-reasons-row mt-1">
-                            {driver.matchTags?.filter(t => !t.includes('Active Assignment')).map((tag, tIdx) => (
-                              <span key={tIdx} className="match-reason-chip">✓ {tag}</span>
-                            ))}
-                          </div>
-                        </div>
+                        <span className={`live-status-indicator ${isOnTrip ? 'status-busy' : 'status-online'}`} title={isOnTrip ? 'On Trip' : 'Available'}></span>
                       </div>
-
-                      <div className="driver-match-stats">
-                        <div className="stat-block">
-                          <div className="stat-value rating-val">
-                            {driver.performance.rating} <Star size={13} fill="#F59E0B" color="#F59E0B" />
-                          </div>
-                          <div className="stat-label">Driver Rating</div>
+                      <div className="rec-profile-text">
+                        <div className="d-flex align-items-center gap-2 flex-wrap">
+                          <h4 className="rec-driver-name">{driver.personalInfo?.name || 'Driver'}</h4>
+                          <span className="driver-id-pill font-mono">{formatDriverCode(driver.id)}</span>
+                          <span className={`availability-pill ${isOnTrip ? 'on-trip' : 'available'}`}>
+                            {isOnTrip ? '● On Trip' : '● Available'}
+                          </span>
                         </div>
-                        <div className="stat-block">
-                          <div className="stat-value">{driver.performance.totalRides}</div>
-                          <div className="stat-label">Completed Rides</div>
+                        <div className="rec-meta-line mt-1">
+                          <span><Phone size={12} className="text-secondary me-1" />{driver.personalInfo?.phone || 'N/A'}</span>
+                          <span className="meta-dot">•</span>
+                          <span><MapPin size={12} className="text-secondary me-1" />{driver.personalInfo?.city || 'Islamabad'}</span>
                         </div>
-                        <div className="stat-block">
-                          <div className="stat-value text-primary font-bold">{driver.matchScore}%</div>
-                          <div className="stat-label">Suitability</div>
-                        </div>
-                      </div>
-
-                      <div className="driver-match-action">
-                        <button 
-                          className="view-panel-btn" 
-                          onClick={() => setViewDriverModal(driver)}
-                          title="Preview what driver sees in Flutter mobile app"
-                        >
-                          <Smartphone size={13} /> Driver App View
-                        </button>
-                        <button 
-                          className={`dispatch-btn ${isTopMatch ? 'highlight-btn' : ''}`} 
-                          onClick={() => handleDispatch(driver)}
-                        >
-                          <Sparkles size={14} /> Dispatch Driver
-                        </button>
                       </div>
                     </div>
+
+                    {/* Middle: Vehicle & Route Info */}
+                    <div className="rec-vehicle-section">
+                      <div className="rec-vehicle-name">
+                        <Car size={15} className="text-primary" />
+                        <strong>{driver.vehicleInfo.make} {driver.vehicleInfo.model}</strong>
+                        <span className="rec-plate-badge">{driver.vehicleInfo.plateNumber}</span>
+                      </div>
+                      <div className="rec-tags-row mt-1.5">
+                        <span className="tag category-tag">{driver.vehicleInfo.category}</span>
+                        {driver.vehicleInfo.ac ? (
+                          <span className="tag ac-tag"><Wind size={11} /> AC Fitted</span>
+                        ) : (
+                          <span className="tag non-ac-tag">Non-AC</span>
+                        )}
+                        <span className="tag seats-tag">{driver.vehicleInfo.seats} Seats</span>
+                      </div>
+                      <div className="rec-routes-list mt-1.5">
+                        <span className="text-xs text-secondary">Routes: </span>
+                        <span className="text-xs font-semibold">{driver.preferences.routes?.join(', ') || 'Islamabad - Rawalpindi'}</span>
+                      </div>
+                    </div>
+
+                    {/* Right-Middle: Suitability & Stats */}
+                    <div className="rec-stats-section">
+                      <div className="match-score-display">
+                        <div className="score-number font-bold text-primary">{driver.matchScore}%</div>
+                        <div className="score-label">Match Score</div>
+                      </div>
+
+                      <div className="rec-kpis-column">
+                        <div className="rec-kpi-item">
+                          <div className="d-flex align-items-center gap-1 font-bold text-sm">
+                            <Star size={13} fill="#F59E0B" color="#F59E0B" />
+                            <span>{driver.performance.rating}</span>
+                          </div>
+                          <span className="text-xs text-secondary">Driver Rating</span>
+                        </div>
+                        <div className="rec-kpi-item">
+                          <div className="font-bold text-sm">{driver.performance.totalRides}</div>
+                          <span className="text-xs text-secondary">Completed Trips</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Right: Action Buttons */}
+                    <div className="rec-actions-section">
+                      <button 
+                        className="rec-app-view-btn" 
+                        onClick={() => setViewDriverModal(driver)}
+                        title="Preview Flutter mobile app view"
+                      >
+                        <Smartphone size={14} /> App View
+                      </button>
+                      <button 
+                        className={`dispatch-btn ${isTopMatch ? 'highlight-btn' : ''}`} 
+                        onClick={() => handleDispatch(driver)}
+                      >
+                        <Sparkles size={14} /> Dispatch Driver
+                      </button>
+                    </div>
                   </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
+
+                  {/* Match Reasons Footer Strip */}
+                  <div className="rec-card-footer">
+                    <span className="rec-match-reasons-label">Match Highlights:</span>
+                    <div className="match-reasons-row">
+                      {driver.matchTags?.filter(t => !t.includes('Active Assignment')).map((tag, tIdx) => (
+                        <span key={tIdx} className="match-reason-chip">✓ {tag}</span>
+                      ))}
+                    </div>
+                    {assignedTrips.length > 0 && (
+                      <span className="active-dispatch-tag ms-auto">
+                        ⚡ {assignedTrips.length} Active Assignment(s)
+                      </span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </div>
   );
