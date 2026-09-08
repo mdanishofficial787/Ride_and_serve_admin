@@ -8,6 +8,7 @@ import {
   approveDriver,
   rejectDriver
 } from '../controllers/driverController.js';
+import { getDriverAssignedRides } from '../controllers/assignmentController.js';
 
 const router = express.Router();
 
@@ -22,6 +23,8 @@ router.route('/')
 
 // Single Driver routes
 router.get('/:id', getDriverById);
+router.get('/:id/rides', getDriverAssignedRides);
+router.get('/:id/assigned-rides', getDriverAssignedRides);
 router.put('/:id/approve', approveDriver);
 router.put('/:id/reject', rejectDriver);
 

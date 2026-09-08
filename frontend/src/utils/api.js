@@ -135,6 +135,16 @@ export const RideAPI = {
   assign: (rideId, driverId, extraData = {}) => request('/ride/assign', {
     method: 'POST',
     body: JSON.stringify({ rideId, driverId, ...extraData })
-  })
+  }),
+
+  // GET /api/ride/assigned - Fetch all assigned rides
+  getAssigned: (params = {}) => {
+    const query = new URLSearchParams(params).toString();
+    return request(`/ride/assigned${query ? `?${query}` : ''}`);
+  },
+
+  // GET /api/ride/driver/:driverId - Fetch assigned rides for driver (Flutter / Driver Panel)
+  getDriverRides: (driverId) => request(`/ride/driver/${driverId}`)
 };
+
 

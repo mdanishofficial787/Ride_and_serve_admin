@@ -100,3 +100,55 @@ export const getAssignments = async (req, res, next) => {
     next(err);
   }
 };
+
+// @desc    Get assigned rides for a specific driver or all drivers (for Driver Panel / Flutter Mobile)
+// @route   GET /api/ride/assigned, GET /api/ride/driver/:driverId, GET /api/drivers/:id/rides
+export const getDriverAssignedRides = async (req, res, next) => {
+  try {
+    const { driverId, id } = req.params;
+    const targetDriverId = driverId || id || req.query.driverId;
+
+    let query = {
+      $or: [
+        { status: 'ASSIGNED' },
+        { status: 'IN_PROGRESS' },
+        { status: 'Dispatched' },
+        { 'assignedDriverDetails.driverCode': { $exists: true } }
+      ]
+    };
+
+    if (targetDriverId) {
+      const isMongoId = targetDriverId.match(/^[0-9a-fA-F]{24}$/);
+      const drvFilter = isMongoId ? { _id: targetDriverId } : { driverId: targetDriverId };
+      const driver = await DriverDB.findOne(drvFilter);
+
+      if (driver) {
+        query = {
+          $or: [
+            { driverId: driver._id },
+            { driverId: driver.driverId },
+            { 'assignedDriverDetails.driverCode': driver.driverId },
+            { 'assignedDriverDetails.name': driver.name }
+          ]
+        };
+      } else {
+        query = {
+          $or: [
+            { driverId: targetDriverId },
+            { 'assignedDriverDetails.driverCode': targetDriverId }
+          ]
+        };
+      }
+    }
+
+    const rides = await RequestDB.find(query, { updatedAt: -1, createdAt: -1 }, 0, 100);
+
+    return sendSuccess(res, {
+      rides,
+      total: rides.length
+    }, 'Driver assigned rides retrieved successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
