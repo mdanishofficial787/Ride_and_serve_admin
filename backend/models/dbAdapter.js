@@ -98,29 +98,120 @@ export const formatRideRecord = (r) => {
 // ==========================================
 export const RideDB = {
   async count(query = {}) {
-    if (!isMemoryMode) return await RideModel.countDocuments(query);
+    if (!isMemoryMode) {
+      try {
+        const client = mongoose.connection?.client;
+        if (client) {
+          return await client.db('ride_and_serve').collection('riderequests').countDocuments(query);
+        }
+      } catch (e) {}
+      return await RideModel.countDocuments(query);
+    }
     return memoryStore.requests.filter(r => matchQuery(r, query)).length;
   },
 
   async find(query = {}, sort = '-createdAt', skip = 0, limit = 50) {
     if (!isMemoryMode) {
+      try {
+        const client = mongoose.connection?.client;
+        if (client) {
+          const appReqs = await client.db('ride_and_serve').collection('riderequests').find({}).sort({ createdAt: -1 }).limit(limit).toArray();
+          return appReqs.map(r => ({
+            _id: r._id,
+            id: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
+            requestId: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
+            rideId: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
+            customerName: r.passengerName || 'Customer',
+            passengerName: r.passengerName || 'Customer',
+            passengerPhone: r.passengerPhone || '',
+            passengerEmail: r.passengerEmail || '',
+            passenger: {
+              name: r.passengerName || 'Customer',
+              phone: r.passengerPhone || '',
+              email: r.passengerEmail || '',
+              gender: r.gender || 'Male'
+            },
+            pickupLocation: r.pickupLocation || '',
+            dropLocation: r.dropoffLocation || r.dropLocation || '',
+            dropoffLocation: r.dropoffLocation || r.dropLocation || '',
+            route: `${r.pickupLocation} -> ${r.dropoffLocation || r.dropLocation}`,
+            fare: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
+            fareFormatted: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
+            scheduledTime: (r.startingFrom ? `${r.startingFrom} ` : '') + (r.timeToReach || r.scheduleTime || '08:30 AM'),
+            date: r.startingFrom || (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'),
+            timeToLeave: r.timeToReach || r.scheduleTime || '08:30 AM',
+            status: r.status || 'Pending Dispatch',
+            vehicleType: r.vehicleType || 'Sedan',
+            vehiclePreference: r.vehicleType || 'Sedan',
+            acPreference: r.acPreference || 'AC',
+            acRequired: (r.acPreference || 'AC').toUpperCase().includes('AC'),
+            assignedDriverDetails: r.assignedDriverDetails || null,
+            driverId: r.driverId || null,
+            createdAt: r.createdAt || new Date(),
+            updatedAt: r.updatedAt || new Date()
+          }));
+        }
+      } catch (e) {
+        console.error('RideDB find error:', e);
+      }
       return await RideModel.find(query).populate('customer').populate('driver').sort(sort).skip(skip).limit(limit);
     }
     return [];
   },
 
   async findOne(filter = {}) {
-    if (!isMemoryMode) return await RideModel.findOne(filter).populate('customer').populate('driver');
+    if (!isMemoryMode) {
+      try {
+        const client = mongoose.connection?.client;
+        if (client) {
+          const reqId = filter.requestId || filter.rideId || filter.id;
+          const query = reqId ? { requestId: reqId } : (filter._id ? { _id: filter._id } : filter);
+          const r = await client.db('ride_and_serve').collection('riderequests').findOne(query);
+          if (r) {
+            return {
+              _id: r._id,
+              id: r.requestId || String(r._id),
+              requestId: r.requestId || String(r._id),
+              rideId: r.requestId || String(r._id),
+              customerName: r.passengerName || 'Customer',
+              passengerName: r.passengerName || 'Customer',
+              passengerPhone: r.passengerPhone || '',
+              pickupLocation: r.pickupLocation || '',
+              dropLocation: r.dropoffLocation || r.dropLocation || '',
+              dropoffLocation: r.dropoffLocation || r.dropLocation || '',
+              route: `${r.pickupLocation} -> ${r.dropoffLocation || r.dropLocation}`,
+              fare: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
+              fareFormatted: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
+              scheduledTime: (r.startingFrom ? `${r.startingFrom} ` : '') + (r.timeToReach || r.scheduleTime || '08:30 AM'),
+              status: r.status || 'Pending Dispatch',
+              vehicleType: r.vehicleType || 'Sedan',
+              vehiclePreference: r.vehicleType || 'Sedan',
+              acPreference: r.acPreference || 'AC',
+              assignedDriverDetails: r.assignedDriverDetails || null,
+              driverId: r.driverId || null
+            };
+          }
+        }
+      } catch (e) {}
+      return await RideModel.findOne(filter).populate('customer').populate('driver');
+    }
     return null;
   },
 
   async findById(id) {
-    if (!isMemoryMode) return await RideModel.findById(id).populate('customer').populate('driver');
-    return null;
+    return await this.findOne({ _id: id });
   },
 
   async update(filter, updateData) {
     if (!isMemoryMode) {
+      try {
+        const client = mongoose.connection?.client;
+        if (client) {
+          const reqId = filter.requestId || filter.rideId || filter.id;
+          const query = reqId ? { requestId: reqId } : (filter._id ? { _id: filter._id } : filter);
+          await client.db('ride_and_serve').collection('riderequests').updateOne(query, { $set: updateData });
+        }
+      } catch (e) {}
       return await RideModel.findOneAndUpdate(filter, updateData, { new: true });
     }
     return null;
@@ -222,39 +313,7 @@ export const RequestDB = {
 
   async find(query = {}, sort = '-createdAt', skip = 0, limit = 50) {
     if (!isMemoryMode) {
-      const testList = await RequestModel.find(query).populate('driverId').sort(sort).skip(skip).limit(limit).lean();
-      try {
-        const client = mongoose.connection?.client;
-        if (client) {
-          const appReqs = await client.db('ride_and_serve').collection('riderequests').find({}).sort({ createdAt: -1 }).limit(limit).toArray();
-          const map = new Map();
-          testList.forEach(r => map.set(r.requestId || String(r._id), r));
-          appReqs.forEach(r => {
-            const key = r.requestId || String(r._id);
-            if (!map.has(key)) {
-              map.set(key, {
-                _id: r._id,
-                requestId: r.requestId,
-                customerName: r.passengerName || 'Customer',
-                passengerName: r.passengerName || 'Customer',
-                passengerPhone: r.passengerPhone || '',
-                pickupLocation: r.pickupLocation || '',
-                dropLocation: r.dropoffLocation || r.dropLocation || '',
-                dropoffLocation: r.dropoffLocation || r.dropLocation || '',
-                fare: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
-                fareFormatted: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
-                scheduledTime: (r.startingFrom ? `${r.startingFrom} ` : '') + (r.timeToReach || r.scheduleTime || '08:30 AM'),
-                status: r.status || 'Pending Dispatch',
-                vehiclePreference: r.vehicleType || 'Sedan',
-                acRequired: (r.acPreference || 'AC').toUpperCase().includes('AC'),
-                createdAt: r.createdAt || new Date()
-              });
-            }
-          });
-          return Array.from(map.values());
-        }
-      } catch (e) {}
-      return testList;
+      return await RequestModel.find(query).populate('driverId').sort(sort).skip(skip).limit(limit).lean();
     }
     let list = memoryStore.requests.filter(r => matchQuery(r, query));
     list = sortList(list, sort);

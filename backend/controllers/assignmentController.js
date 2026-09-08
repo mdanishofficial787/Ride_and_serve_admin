@@ -202,19 +202,18 @@ export const getDriverAssignedRides = async (req, res, next) => {
 };
 
 // @desc    Get all rides with mapped structure & pending/assigned counts
+// @desc    Get all rides with mapped structure & pending/assigned counts
 // @route   GET /api/rides
 export const getAllRides = async (req, res, next) => {
   try {
     const rawCustomerRides = await RideDB.find({}, { createdAt: -1, updatedAt: -1 }, 0, 100);
-    const rawRequests = await RequestDB.find({}, { createdAt: -1, updatedAt: -1 }, 0, 100);
-
     const formattedCustomerRides = (rawCustomerRides || []).map(formatRideRecord);
-    const formattedRequests = (rawRequests || []).map(formatRideRecord);
 
     const idMap = new Map();
-    [...formattedCustomerRides, ...formattedRequests].forEach(r => {
-      if (r && r._id) {
-        idMap.set(String(r._id), r);
+    formattedCustomerRides.forEach(r => {
+      const key = r.requestId || r.id || String(r._id);
+      if (!idMap.has(key)) {
+        idMap.set(key, r);
       }
     });
 
@@ -278,9 +277,9 @@ export const dispatchDriverToRide = async (req, res, next) => {
     const assignedRating = driver?.rating || driver?.performance?.rating || 4.8;
 
     const isMongoId = id.match(/^[0-9a-fA-F]{24}$/);
-    const rideFilter = isMongoId ? { _id: id } : { rideId: id };
+    const rideFilter = isMongoId ? { _id: id } : { requestId: id };
 
-    // Check RideDB first
+    // Check RideDB first (Customer app rides in ride_and_serve.riderequests)
     let ride = await RideDB.findOne(rideFilter);
     if (ride) {
       await AssignmentDB.create({
@@ -294,6 +293,8 @@ export const dispatchDriverToRide = async (req, res, next) => {
         status: 'ASSIGNED',
         driver: driver?._id || driverId || null,
         driverId: driver?._id || driverId || null,
+        assignedDriver: assignedDriverName,
+        assignedDriverPhone: assignedPhone,
         assignedDriverDetails: {
           driverCode: assignedDriverCode,
           name: assignedDriverName,
@@ -309,7 +310,7 @@ export const dispatchDriverToRide = async (req, res, next) => {
 
       return sendSuccess(res, {
         rideId: ride._id,
-        requestId: ride.rideId || ride._id,
+        requestId: ride.requestId || ride.id || ride._id,
         status: 'ASSIGNED',
         driverName: assignedDriverName,
         driverCode: assignedDriverCode

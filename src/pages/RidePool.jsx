@@ -61,7 +61,9 @@ const RidePool = () => {
       const res = await fetch(`${BACKEND_URL}/api/requests`);
       const data = await res.json();
       if (data.success && data.data?.requests) {
-        const mapped = data.data.requests.map(r => {
+        // Exclude customer dispatch ride requests (REQ-) so only actual ride pools are shown in Ride Pool
+        const poolRequests = data.data.requests.filter(r => !String(r.requestId || r.id).startsWith('REQ-'));
+        const mapped = poolRequests.map(r => {
           const vCat = r.vehiclePreference || 'Sedan';
           const maxCap = r.maxSeats || VEHICLE_MAX_SEATS[vCat] || 4;
           // Dynamic Seat Capacity Control: cap bookings at physical vehicle seat limit
