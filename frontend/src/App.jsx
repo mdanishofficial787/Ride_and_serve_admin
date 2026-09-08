@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import AdminLayout from './layouts/AdminLayout';
 import DriverApproval from './pages/DriverApproval';
 import RideDispatch from './pages/RideDispatch';
+import AdminRideDispatch from './pages/AdminRideDispatch';
 import RidePool from './pages/RidePool';
 import PendingRides from './pages/PendingRides';
 import PasswordResetRequests from './pages/PasswordResetRequests';
@@ -47,6 +48,7 @@ function App() {
           <Route path="driver-approval" element={<DriverApproval />} />
           <Route path="password-resets" element={<PasswordResetRequests />} />
           <Route path="driver-selection" element={<RideDispatch />} />
+          <Route path="admin-dispatch" element={<AdminRideDispatch />} />
           <Route path="driver-rating" element={<DriverRating />} />
           <Route path="ride-pool" element={<RidePool />} />
           <Route path="pending-rides" element={<PendingRides />} />
