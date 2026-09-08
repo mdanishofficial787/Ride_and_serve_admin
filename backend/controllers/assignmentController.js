@@ -141,6 +141,17 @@ export const getDriverAssignedRides = async (req, res, next) => {
       }
     }
 
+    const rides = await RequestDB.find(query, { updatedAt: -1, createdAt: -1 }, 0, 100);
+
+    return sendSuccess(res, {
+      rides,
+      total: rides.length
+    }, 'Driver assigned rides retrieved successfully');
+  } catch (err) {
+    next(err);
+  }
+};
+
 // @desc    Get all rides with mapped structure & pending/assigned counts
 // @route   GET /api/rides
 export const getAllRides = async (req, res, next) => {
