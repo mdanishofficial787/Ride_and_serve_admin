@@ -1,12 +1,127 @@
 import mongoose from 'mongoose';
 import DriverModel from './Driver.js';
 import RequestModel from './Request.js';
+import RideModel from './Ride.js';
+import CustomerModel from './Customer.js';
 import AssignmentModel from './Assignment.js';
 import AdminStatsModel from './AdminStats.js';
 import { isMemoryMode, memoryStore } from '../config/db.js';
 
 const generateId = (prefix = 'ID') => `${prefix}-${Date.now().toString().slice(-4)}${Math.floor(Math.random() * 90 + 10)}`;
 const generateMongoId = () => new mongoose.Types.ObjectId().toString();
+
+// ==========================================
+// RIDE / REQUEST NORMALIZER
+// ==========================================
+export const formatRideRecord = (r) => {
+  if (!r) return null;
+  const isPlain = typeof r.toObject === 'function' ? r.toObject() : r;
+  const cust = isPlain.customer || {};
+  const drv = isPlain.driver || isPlain.driverId || {};
+
+  const pickup = typeof isPlain.pickupLocation === 'object' && isPlain.pickupLocation !== null
+    ? (isPlain.pickupLocation.address || 'Pickup')
+    : (isPlain.pickupLocation || 'Pickup');
+
+  const drop = typeof isPlain.dropoffLocation === 'object' && isPlain.dropoffLocation !== null
+    ? (isPlain.dropoffLocation.address || 'Drop-off')
+    : (typeof isPlain.dropLocation === 'object' && isPlain.dropLocation !== null
+      ? (isPlain.dropLocation.address || 'Drop-off')
+      : (isPlain.dropoffLocation || isPlain.dropLocation || 'Drop-off'));
+
+  const custName = cust.fullName || cust.name || isPlain.customerName || isPlain.passenger?.name || 'Customer';
+  const custPhone = cust.PhoneNumber || cust.phone || isPlain.customerPhone || isPlain.passenger?.phone || '';
+  const custEmail = cust.Email || cust.email || isPlain.customerEmail || isPlain.passenger?.email || '';
+
+  const fareFormatted = isPlain.fare !== undefined && isPlain.fare !== null
+    ? (typeof isPlain.fare === 'number' ? `AED ${isPlain.fare}` : String(isPlain.fare).startsWith('AED') || String(isPlain.fare).startsWith('Rs') ? String(isPlain.fare) : `Rs. ${isPlain.fare}`)
+    : 'AED 45';
+
+  const isAssigned = isPlain.status === 'ASSIGNED' || isPlain.status === 'assigned' || !!isPlain.driver || !!isPlain.driverId || !!isPlain.assignedDriverDetails?.name;
+
+  const dateStr = isPlain.date || (isPlain.createdAt ? new Date(isPlain.createdAt).toLocaleDateString() : 'Today');
+  const timeStr = isPlain.timeToLeave || (isPlain.createdAt ? new Date(isPlain.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '08:00 AM');
+
+  return {
+    _id: isPlain._id,
+    id: isPlain.rideId || isPlain.requestId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
+    requestId: isPlain.rideId || isPlain.requestId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
+    rideId: isPlain.rideId || isPlain.requestId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
+    customerName: custName,
+    customerPhone: custPhone,
+    customerEmail: custEmail,
+    passenger: {
+      name: custName,
+      phone: custPhone,
+      email: custEmail,
+      gender: cust.gender || isPlain.gender || 'Male'
+    },
+    pickupLocation: pickup,
+    dropLocation: drop,
+    dropoffLocation: drop,
+    route: {
+      summary: `${pickup} ➔ ${drop}`,
+      pickupLocation: pickup,
+      dropLocation: drop,
+      passengers: `${isPlain.seatsNeeded || 1} Passenger(s)`
+    },
+    date: dateStr,
+    timeToLeave: timeStr,
+    scheduledTime: `${dateStr} ${timeStr}`.trim(),
+    fare: fareFormatted,
+    fareFormatted: fareFormatted,
+    seatsNeeded: isPlain.seatsNeeded || 1,
+    rideType: isPlain.rideType || 'Standard',
+    vehiclePreference: isPlain.vehiclePreference || 'Sedan',
+    acRequired: isPlain.acRequired !== false,
+    status: isAssigned ? 'ASSIGNED' : 'Pending Dispatch',
+    rawStatus: isPlain.status,
+    driver: isPlain.driver || isPlain.driverId || null,
+    driverId: isPlain.driver || isPlain.driverId || null,
+    assignedDriverDetails: isPlain.assignedDriverDetails || (drv._id ? {
+      name: drv.Name || drv.name,
+      phone: drv.PhoneNumber || drv.phone,
+      driverCode: drv.driverReferenceId || drv.driverId
+    } : null),
+    source: isPlain.source || 'APP',
+    createdAt: isPlain.createdAt,
+    updatedAt: isPlain.updatedAt
+  };
+};
+
+// ==========================================
+// RIDE ADAPTER (Customer App rides collection)
+// ==========================================
+export const RideDB = {
+  async count(query = {}) {
+    if (!isMemoryMode) return await RideModel.countDocuments(query);
+    return memoryStore.requests.filter(r => matchQuery(r, query)).length;
+  },
+
+  async find(query = {}, sort = '-createdAt', skip = 0, limit = 50) {
+    if (!isMemoryMode) {
+      return await RideModel.find(query).populate('customer').populate('driver').sort(sort).skip(skip).limit(limit);
+    }
+    return [];
+  },
+
+  async findOne(filter = {}) {
+    if (!isMemoryMode) return await RideModel.findOne(filter).populate('customer').populate('driver');
+    return null;
+  },
+
+  async findById(id) {
+    if (!isMemoryMode) return await RideModel.findById(id).populate('customer').populate('driver');
+    return null;
+  },
+
+  async update(filter, updateData) {
+    if (!isMemoryMode) {
+      return await RideModel.findOneAndUpdate(filter, updateData, { new: true });
+    }
+    return null;
+  }
+};
 
 // ==========================================
 // DRIVER ADAPTER
@@ -17,7 +132,7 @@ export const DriverDB = {
     return memoryStore.drivers.filter(d => matchQuery(d, query)).length;
   },
 
-  async find(query = {}, sort = '-createdAt', skip = 0, limit = 20) {
+  async find(query = {}, sort = '-createdAt', skip = 0, limit = 50) {
     if (!isMemoryMode) {
       return await DriverModel.find(query).sort(sort).skip(skip).limit(limit);
     }
@@ -101,7 +216,7 @@ export const RequestDB = {
     return memoryStore.requests.filter(r => matchQuery(r, query)).length;
   },
 
-  async find(query = {}, sort = '-createdAt', skip = 0, limit = 30) {
+  async find(query = {}, sort = '-createdAt', skip = 0, limit = 50) {
     if (!isMemoryMode) {
       return await RequestModel.find(query).populate('driverId').sort(sort).skip(skip).limit(limit);
     }
@@ -204,7 +319,7 @@ export const AssignmentDB = {
     return memoryStore.assignments.filter(a => matchQuery(a, query)).length;
   },
 
-  async find(query = {}, sort = '-createdAt', skip = 0, limit = 20) {
+  async find(query = {}, sort = '-createdAt', skip = 0, limit = 50) {
     if (!isMemoryMode) {
       return await AssignmentModel.find(query).populate('requestId').populate('driverId').sort(sort).skip(skip).limit(limit);
     }

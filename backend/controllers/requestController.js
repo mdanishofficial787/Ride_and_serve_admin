@@ -1,7 +1,7 @@
-import { RequestDB } from '../models/dbAdapter.js';
+import { RequestDB, RideDB, formatRideRecord } from '../models/dbAdapter.js';
 import { sendSuccess, sendError } from '../middleware/responseHandler.js';
 
-// @desc    Get all requests with filtering & pagination
+// @desc    Get all requests / rides with filtering & pagination
 // @route   GET /api/requests
 export const getRequests = async (req, res, next) => {
   try {
@@ -47,11 +47,39 @@ export const getRequests = async (req, res, next) => {
     const limitNum = parseInt(limit, 10) || 30;
     const skip = (pageNum - 1) * limitNum;
 
-    const total = await RequestDB.count(query);
-    const requests = await RequestDB.find(query, sort, skip, limitNum);
+    // Query both collections: customer mobile rides and manual admin requests
+    const rawRides = await RideDB.find({}, sort, 0, 100);
+    const rawRequests = await RequestDB.find(query, sort, skip, limitNum);
+
+    const formattedRides = (rawRides || []).map(formatRideRecord);
+    const formattedRequests = (rawRequests || []).map(formatRideRecord);
+
+    // Merge customer rides and requests, removing any duplicates by _id
+    const idMap = new Map();
+    [...formattedRides, ...formattedRequests].forEach(r => {
+      if (r && r._id) {
+        idMap.set(String(r._id), r);
+      }
+    });
+
+    let merged = Array.from(idMap.values());
+
+    if (search) {
+      const s = search.toLowerCase();
+      merged = merged.filter(r => 
+        (r.customerName && r.customerName.toLowerCase().includes(s)) ||
+        (r.pickupLocation && r.pickupLocation.toLowerCase().includes(s)) ||
+        (r.dropLocation && r.dropLocation.toLowerCase().includes(s)) ||
+        (r.requestId && r.requestId.toLowerCase().includes(s))
+      );
+    }
+
+    const total = merged.length;
+    const pagedRequests = merged.slice(skip, skip + limitNum);
 
     return sendSuccess(res, {
-      requests,
+      requests: pagedRequests,
+      rides: pagedRequests,
       pagination: {
         total,
         page: pageNum,
@@ -64,42 +92,72 @@ export const getRequests = async (req, res, next) => {
   }
 };
 
-// @desc    Get pending rides queue (for Pending Rides Monitor screen)
-// @route   GET /api/requests/pending
+// @desc    Get pending rides queue (for Pending Rides Monitor screen / Driver Dispatch)
+// @route   GET /api/requests/pending, GET /api/ride/pending
 export const getPendingRides = async (req, res, next) => {
   try {
     const { filterStatus = 'All', search = '' } = req.query;
 
-    const pendingStatuses = [
-      'PENDING',
-      'Awaiting Driver Acceptance',
-      'Scheduled (Not Completed)',
-      'Waiting for Payment',
-      'Awaiting Admin Confirmation',
-      'Waiting for Driver'
-    ];
+    // 1. Fetch rides from `rides` collection (Customer App)
+    const rawCustomerRides = await RideDB.find({
+      $or: [
+        { status: 'pending' },
+        { status: 'PENDING' },
+        { status: 'Visible' },
+        { status: 'Waiting for Driver' },
+        { status: { $exists: false } }
+      ]
+    }, { createdAt: -1 }, 0, 100);
 
-    const query = {};
+    // 2. Fetch requests from `requests` collection (Admin Manual)
+    const query = {
+      $and: [
+        { status: { $ne: 'ASSIGNED' } },
+        { status: { $ne: 'COMPLETED' } },
+        { status: { $ne: 'CANCELLED' } },
+        { status: { $not: /^Dispatched/ } }
+      ]
+    };
 
     if (filterStatus && filterStatus !== 'All') {
       query.status = filterStatus;
-    } else {
-      query.status = { $in: pendingStatuses };
     }
+
+    const rawRequests = await RequestDB.find(query, { isOverdue: -1, createdAt: -1 }, 0, 100);
+
+    // 3. Format and merge both sources
+    const formattedRides = (rawCustomerRides || []).map(formatRideRecord);
+    const formattedRequests = (rawRequests || []).map(formatRideRecord);
+
+    const idMap = new Map();
+    [...formattedRides, ...formattedRequests].forEach(r => {
+      if (r && r._id && r.status !== 'ASSIGNED' && !String(r.status).startsWith('Dispatched')) {
+        idMap.set(String(r._id), r);
+      }
+    });
+
+    let rides = Array.from(idMap.values());
 
     if (search) {
-      query.$or = [
-        { customerName: new RegExp(search, 'i') },
-        { pickupLocation: new RegExp(search, 'i') },
-        { dropLocation: new RegExp(search, 'i') },
-        { requestId: new RegExp(search, 'i') }
-      ];
+      const s = search.toLowerCase();
+      rides = rides.filter(r => 
+        (r.customerName && r.customerName.toLowerCase().includes(s)) ||
+        (r.pickupLocation && r.pickupLocation.toLowerCase().includes(s)) ||
+        (r.dropLocation && r.dropLocation.toLowerCase().includes(s)) ||
+        (r.requestId && r.requestId.toLowerCase().includes(s))
+      );
     }
 
-    // Overdue rides first, then newest
-    const rides = await RequestDB.find(query, { isOverdue: -1, createdAt: -1 }, 0, 100);
-
-    return sendSuccess(res, rides, 'Pending rides retrieved successfully');
+    return res.status(200).json({
+      success: true,
+      message: 'Pending rides retrieved successfully',
+      data: {
+        rides,
+        total: rides.length
+      },
+      rides,
+      total: rides.length
+    });
   } catch (err) {
     next(err);
   }
@@ -109,14 +167,19 @@ export const getPendingRides = async (req, res, next) => {
 // @route   GET /api/requests/stats
 export const getRequestStats = async (req, res, next) => {
   try {
-    const totalRides = await RequestDB.count();
+    const totalRequests = await RequestDB.count();
+    const totalCustomerRides = await RideDB.count();
+    const totalRides = totalRequests + totalCustomerRides;
+
     const availableRides = await RequestDB.count({
       $or: [{ status: 'Visible' }, { visibility: 'VISIBLE', status: { $ne: 'ASSIGNED' } }]
-    });
+    }) + await RideDB.count({ status: 'pending' });
+
     const assignedRides = await RequestDB.count({
       $or: [{ status: 'ASSIGNED' }, { status: 'COMPLETED' }, { status: /^Dispatched/ }]
-    });
-    const cancelledRides = await RequestDB.count({ status: 'CANCELLED' });
+    }) + await RideDB.count({ status: 'ASSIGNED' });
+
+    const cancelledRides = await RequestDB.count({ status: 'CANCELLED' }) + await RideDB.count({ status: 'CANCELLED' });
 
     const allRides = await RequestDB.find({}, null, 0, 1000);
     const driverRequestsCount = allRides.reduce((acc, r) => acc + (r.driverRequests?.length || 0), 0);
@@ -140,6 +203,16 @@ export const getRequestById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
+    // Check RideDB first
+    let ride = await RideDB.findById(id);
+    if (!ride) {
+      ride = await RideDB.findOne({ rideId: id });
+    }
+    if (ride) {
+      return sendSuccess(res, formatRideRecord(ride), 'Ride details retrieved successfully');
+    }
+
+    // Check RequestDB
     let request = await RequestDB.findById(id);
     if (!request) {
       request = await RequestDB.findOne({ requestId: id });
@@ -149,7 +222,7 @@ export const getRequestById = async (req, res, next) => {
       return sendError(res, `Ride request not found with id: ${id}`, 404);
     }
 
-    return sendSuccess(res, request, 'Ride request details retrieved successfully');
+    return sendSuccess(res, formatRideRecord(request), 'Ride request details retrieved successfully');
   } catch (err) {
     next(err);
   }
@@ -211,7 +284,7 @@ export const createRequest = async (req, res, next) => {
 
     const saved = await RequestDB.create(newRequestData);
 
-    return sendSuccess(res, saved, `Ride request ${saved.requestId} created successfully`, 201);
+    return sendSuccess(res, formatRideRecord(saved), `Ride request ${saved.requestId} created successfully`, 201);
   } catch (err) {
     next(err);
   }
@@ -226,7 +299,7 @@ export const updateRequest = async (req, res, next) => {
 
     const filter = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { requestId: id };
 
-    const updated = await RequestDB.update(
+    let updated = await RequestDB.update(
       filter,
       {
         ...updateData,
@@ -241,10 +314,15 @@ export const updateRequest = async (req, res, next) => {
     );
 
     if (!updated) {
+      const rideFilter = id.match(/^[0-9a-fA-F]{24}$/) ? { _id: id } : { rideId: id };
+      updated = await RideDB.update(rideFilter, updateData);
+    }
+
+    if (!updated) {
       return sendError(res, `Ride request not found with id: ${id}`, 404);
     }
 
-    return sendSuccess(res, updated, `Ride ${updated.requestId} updated successfully`);
+    return sendSuccess(res, formatRideRecord(updated), `Ride updated successfully`);
   } catch (err) {
     next(err);
   }
@@ -279,7 +357,7 @@ export const toggleVisibility = async (req, res, next) => {
       }
     });
 
-    return sendSuccess(res, updated, `Ride visibility updated to ${nextVisibility}`);
+    return sendSuccess(res, formatRideRecord(updated), `Ride visibility updated to ${nextVisibility}`);
   } catch (err) {
     next(err);
   }

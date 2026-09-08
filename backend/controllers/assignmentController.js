@@ -1,8 +1,8 @@
-import { AssignmentDB, RequestDB, DriverDB } from '../models/dbAdapter.js';
+import { AssignmentDB, RequestDB, RideDB, DriverDB, formatRideRecord } from '../models/dbAdapter.js';
 import { sendSuccess, sendError } from '../middleware/responseHandler.js';
 
 // @desc    Assign driver to ride request
-// @route   POST /api/assignments
+// @route   POST /api/ride/assign, POST /api/assignments
 export const createAssignment = async (req, res, next) => {
   try {
     const { requestId, rideId, driverId, remarks } = req.body;
@@ -12,18 +12,69 @@ export const createAssignment = async (req, res, next) => {
       return sendError(res, 'Both rideId (or requestId) and driverId are required', 400);
     }
 
-    // Find Request
-    const reqFilter = targetRideId.match(/^[0-9a-fA-F]{24}$/) ? { _id: targetRideId } : { requestId: targetRideId };
-    const request = await RequestDB.findOne(reqFilter);
-    if (!request) {
-      return sendError(res, `Ride request not found: ${targetRideId}`, 404);
-    }
-
-    // Find Driver
+    // 1. Find Driver
     const drvFilter = driverId.match(/^[0-9a-fA-F]{24}$/) ? { _id: driverId } : { driverId };
     const driver = await DriverDB.findOne(drvFilter);
     if (!driver) {
       return sendError(res, `Driver not found: ${driverId}`, 404);
+    }
+
+    const assignedDriverName = driver.Name || driver.name || 'Assigned Driver';
+    const assignedDriverCode = driver.driverReferenceId || driver.driverId || `DRV-${String(driver._id).slice(-6).toUpperCase()}`;
+    const assignedPhone = driver.PhoneNumber || driver.phone || '+92 300 0000000';
+    const assignedVehicle = `${driver.vehicleDetails?.make || ''} ${driver.vehicleDetails?.model || ''}`.trim() || driver.vehicleType || 'Sedan';
+    const assignedRating = driver.rating || 4.8;
+
+    // 2. Check RideDB first (Customer App rides)
+    const isMongoId = targetRideId.match(/^[0-9a-fA-F]{24}$/);
+    const rideFilter = isMongoId ? { _id: targetRideId } : { rideId: targetRideId };
+    let ride = await RideDB.findOne(rideFilter);
+
+    if (ride) {
+      // Update Ride in `rides` collection
+      const updatedRide = await RideDB.update(rideFilter, {
+        status: 'ASSIGNED',
+        driver: driver._id,
+        driverId: driver._id,
+        assignedDriverDetails: {
+          driverCode: assignedDriverCode,
+          name: assignedDriverName,
+          phone: assignedPhone,
+          vehicle: assignedVehicle,
+          rating: assignedRating
+        },
+        $push: {
+          timeline: {
+            action: 'DISPATCHED',
+            performedBy: 'Dispatcher',
+            details: `Ride assigned to ${assignedDriverName} (${assignedDriverCode})`
+          }
+        }
+      });
+
+      // Create Assignment record
+      const newAssignment = await AssignmentDB.create({
+        requestId: ride._id,
+        driverId: driver._id,
+        status: 'ASSIGNED',
+        remarks: remarks || `Dispatched to ${assignedDriverName}`
+      });
+
+      // Update Driver Availability
+      await DriverDB.update(drvFilter, { availability: 'On Trip' });
+
+      return sendSuccess(res, {
+        ...newAssignment,
+        ride: formatRideRecord(updatedRide || ride),
+        driver
+      }, `Ride ${ride.rideId || targetRideId} successfully assigned to ${assignedDriverName}`, 201);
+    }
+
+    // 3. Fallback: Check RequestDB (Admin Manual requests)
+    const reqFilter = isMongoId ? { _id: targetRideId } : { requestId: targetRideId };
+    const request = await RequestDB.findOne(reqFilter);
+    if (!request) {
+      return sendError(res, `Ride request not found: ${targetRideId}`, 404);
     }
 
     // Create Assignment
@@ -31,7 +82,7 @@ export const createAssignment = async (req, res, next) => {
       requestId: request._id,
       driverId: driver._id,
       status: 'ASSIGNED',
-      remarks: remarks || `Dispatched to ${driver.name}`
+      remarks: remarks || `Dispatched to ${assignedDriverName}`
     });
 
     // Update Request
@@ -39,17 +90,17 @@ export const createAssignment = async (req, res, next) => {
       status: 'ASSIGNED',
       driverId: driver._id,
       assignedDriverDetails: {
-        driverCode: driver.driverId,
-        name: driver.name,
-        phone: driver.phone,
-        vehicle: `${driver.vehicleDetails?.year || ''} ${driver.vehicleDetails?.make || ''} ${driver.vehicleDetails?.model || ''}`.trim() || driver.vehicleType,
-        rating: driver.rating
+        driverCode: assignedDriverCode,
+        name: assignedDriverName,
+        phone: assignedPhone,
+        vehicle: assignedVehicle,
+        rating: assignedRating
       },
       $push: {
         timeline: {
           action: 'DISPATCHED',
           performedBy: 'Dispatcher',
-          details: `Ride assigned to ${driver.name} (${driver.driverId})`
+          details: `Ride assigned to ${assignedDriverName} (${assignedDriverCode})`
         }
       }
     });
@@ -61,9 +112,9 @@ export const createAssignment = async (req, res, next) => {
 
     return sendSuccess(res, {
       ...newAssignment,
-      request,
+      request: formatRideRecord(request),
       driver
-    }, `Ride ${request.requestId} successfully assigned to ${driver.name}`, 201);
+    }, `Ride ${request.requestId} successfully assigned to ${assignedDriverName}`, 201);
   } catch (err) {
     next(err);
   }
@@ -108,44 +159,42 @@ export const getDriverAssignedRides = async (req, res, next) => {
     const { driverId, id } = req.params;
     const targetDriverId = driverId || id || req.query.driverId;
 
-    let query = {
-      $or: [
-        { status: 'ASSIGNED' },
-        { status: 'IN_PROGRESS' },
-        { status: 'Dispatched' },
-        { 'assignedDriverDetails.driverCode': { $exists: true } }
-      ]
-    };
-
+    let driverObj = null;
     if (targetDriverId) {
       const isMongoId = targetDriverId.match(/^[0-9a-fA-F]{24}$/);
       const drvFilter = isMongoId ? { _id: targetDriverId } : { driverId: targetDriverId };
-      const driver = await DriverDB.findOne(drvFilter);
-
-      if (driver) {
-        query = {
-          $or: [
-            { driverId: driver._id },
-            { driverId: driver.driverId },
-            { 'assignedDriverDetails.driverCode': driver.driverId },
-            { 'assignedDriverDetails.name': driver.name }
-          ]
-        };
-      } else {
-        query = {
-          $or: [
-            { driverId: targetDriverId },
-            { 'assignedDriverDetails.driverCode': targetDriverId }
-          ]
-        };
-      }
+      driverObj = await DriverDB.findOne(drvFilter);
     }
 
-    const rides = await RequestDB.find(query, { updatedAt: -1, createdAt: -1 }, 0, 100);
+    // Query assigned rides in `rides` collection
+    let rideQuery = {
+      $or: [
+        { status: 'ASSIGNED' },
+        { status: 'assigned' },
+        { driver: { $ne: null } },
+        { driverId: { $ne: null } }
+      ]
+    };
+
+    if (driverObj) {
+      rideQuery = {
+        $or: [
+          { driver: driverObj._id },
+          { driverId: driverObj._id },
+          { 'assignedDriverDetails.driverCode': driverObj.driverId || driverObj.driverReferenceId },
+          { 'assignedDriverDetails.name': driverObj.Name || driverObj.name }
+        ]
+      };
+    }
+
+    const rawCustomerRides = await RideDB.find(rideQuery, { updatedAt: -1, createdAt: -1 }, 0, 100);
+    const rawRequests = await RequestDB.find(rideQuery, { updatedAt: -1, createdAt: -1 }, 0, 100);
+
+    const formattedRides = [...rawCustomerRides, ...rawRequests].map(formatRideRecord);
 
     return sendSuccess(res, {
-      rides,
-      total: rides.length
+      rides: formattedRides,
+      total: formattedRides.length
     }, 'Driver assigned rides retrieved successfully');
   } catch (err) {
     next(err);
@@ -156,61 +205,30 @@ export const getDriverAssignedRides = async (req, res, next) => {
 // @route   GET /api/rides
 export const getAllRides = async (req, res, next) => {
   try {
-    const rawRides = await RequestDB.find({}, { createdAt: -1, updatedAt: -1 }, 0, 200);
+    const rawCustomerRides = await RideDB.find({}, { createdAt: -1, updatedAt: -1 }, 0, 100);
+    const rawRequests = await RequestDB.find({}, { createdAt: -1, updatedAt: -1 }, 0, 100);
+
+    const formattedCustomerRides = (rawCustomerRides || []).map(formatRideRecord);
+    const formattedRequests = (rawRequests || []).map(formatRideRecord);
+
+    const idMap = new Map();
+    [...formattedCustomerRides, ...formattedRequests].forEach(r => {
+      if (r && r._id) {
+        idMap.set(String(r._id), r);
+      }
+    });
+
+    const rides = Array.from(idMap.values());
 
     let pendingCount = 0;
     let assignedCount = 0;
 
-    const rides = rawRides.map(r => {
-      const isAssigned = r.status === 'ASSIGNED' || (r.status && r.status.startsWith('Dispatched')) || !!r.assignedDriverDetails?.name;
-      if (isAssigned) {
+    rides.forEach(r => {
+      if (r.status === 'ASSIGNED' || String(r.status).startsWith('Dispatched')) {
         assignedCount++;
       } else {
         pendingCount++;
       }
-
-      const passengerName = r.customerName || r.passenger?.name || 'Passenger';
-      const passengerPhone = r.customerPhone || r.passenger?.phone || '+92 300 1234567';
-      const pickup = r.pickupLocation || 'Islamabad';
-      const drop = r.dropLocation || 'Rawalpindi';
-      const vehiclePref = r.vehiclePreference || r.preferences?.vehicleCategory || 'Sedan';
-      const acReq = r.acRequired !== false;
-
-      return {
-        _id: r._id,
-        requestId: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
-        passenger: {
-          name: passengerName,
-          phone: passengerPhone,
-          email: r.customerEmail || r.passenger?.email || '',
-          gender: r.gender || 'Male'
-        },
-        route: {
-          summary: `${pickup} ➔ ${drop}`,
-          pickupLocation: pickup,
-          dropLocation: drop,
-          passengers: `${r.seatsNeeded || 1} Passenger(s)`
-        },
-        pickupLocation: pickup,
-        dropLocation: drop,
-        scheduledTime: `${r.date || ''} ${r.timeToLeave || ''}`.trim() || 'Today 08:00 AM',
-        date: `${r.date || ''} ${r.timeToLeave || ''}`.trim() || 'Today 08:00 AM',
-        vehicle: {
-          category: vehiclePref,
-          ac: acReq,
-          label: `${vehiclePref}${acReq ? ' • AC' : ' • Non-AC'}`
-        },
-        preferences: {
-          vehicleCategory: vehiclePref,
-          acRequired: acReq
-        },
-        fareFormatted: r.fare || 'Rs. 2,500',
-        fare: r.fare || 'Rs. 2,500',
-        seatsNeeded: r.seatsNeeded || 1,
-        status: isAssigned ? 'ASSIGNED' : 'Pending Dispatch',
-        driverId: r.driverId,
-        assignedDriverDetails: r.assignedDriverDetails
-      };
     });
 
     return res.status(200).json({
@@ -241,14 +259,6 @@ export const dispatchDriverToRide = async (req, res, next) => {
       return sendError(res, 'Ride ID is required', 400);
     }
 
-    const isMongoId = id.match(/^[0-9a-fA-F]{24}$/);
-    const reqFilter = isMongoId ? { _id: id } : { requestId: id };
-    const request = await RequestDB.findOne(reqFilter);
-
-    if (!request) {
-      return sendError(res, `Ride request not found: ${id}`, 404);
-    }
-
     let driver = null;
     if (driverId) {
       const drvMongo = driverId.match(/^[0-9a-fA-F]{24}$/);
@@ -258,17 +268,65 @@ export const dispatchDriverToRide = async (req, res, next) => {
     if (!driver && driverName) {
       driver = await DriverDB.findOne({
         $or: [
+          { Name: new RegExp(`^${driverName.trim()}$`, 'i') },
           { name: new RegExp(`^${driverName.trim()}$`, 'i') },
           { 'personalInfo.name': new RegExp(`^${driverName.trim()}$`, 'i') }
         ]
       });
     }
 
-    const assignedDriverName = driverName || driver?.name || driver?.personalInfo?.name || 'Assigned Driver';
-    const assignedDriverCode = driver?.driverId || driver?.id || `DRV-${String(driver?._id || id).slice(-6).toUpperCase()}`;
-    const assignedPhone = driver?.phone || driver?.personalInfo?.phone || '+92 300 0000000';
+    const assignedDriverName = driver?.Name || driverName || driver?.name || driver?.personalInfo?.name || 'Assigned Driver';
+    const assignedDriverCode = driver?.driverReferenceId || driver?.driverId || driver?.id || `DRV-${String(driver?._id || id).slice(-6).toUpperCase()}`;
+    const assignedPhone = driver?.PhoneNumber || driver?.phone || driver?.personalInfo?.phone || '+92 300 0000000';
     const assignedVehicle = driver ? `${driver.vehicleDetails?.make || driver.vehicleInfo?.make || ''} ${driver.vehicleDetails?.model || driver.vehicleInfo?.model || ''}`.trim() || driver.vehicleType || 'Sedan' : 'Vehicle';
     const assignedRating = driver?.rating || driver?.performance?.rating || 4.8;
+
+    const isMongoId = id.match(/^[0-9a-fA-F]{24}$/);
+    const rideFilter = isMongoId ? { _id: id } : { rideId: id };
+
+    // Check RideDB first
+    let ride = await RideDB.findOne(rideFilter);
+    if (ride) {
+      await AssignmentDB.create({
+        requestId: ride._id,
+        driverId: driver?._id || driverId || null,
+        status: 'ASSIGNED',
+        remarks: remarks || `Dispatched to ${assignedDriverName}`
+      });
+
+      await RideDB.update(rideFilter, {
+        status: 'ASSIGNED',
+        driver: driver?._id || driverId || null,
+        driverId: driver?._id || driverId || null,
+        assignedDriverDetails: {
+          driverCode: assignedDriverCode,
+          name: assignedDriverName,
+          phone: assignedPhone,
+          vehicle: assignedVehicle,
+          rating: assignedRating
+        }
+      });
+
+      if (driver) {
+        await DriverDB.update({ _id: driver._id }, { availability: 'On Trip' });
+      }
+
+      return sendSuccess(res, {
+        rideId: ride._id,
+        requestId: ride.rideId || ride._id,
+        status: 'ASSIGNED',
+        driverName: assignedDriverName,
+        driverCode: assignedDriverCode
+      }, `Driver ${assignedDriverName} successfully dispatched to ride`);
+    }
+
+    // Check RequestDB
+    const reqFilter = isMongoId ? { _id: id } : { requestId: id };
+    const request = await RequestDB.findOne(reqFilter);
+
+    if (!request) {
+      return sendError(res, `Ride request not found: ${id}`, 404);
+    }
 
     // Create Assignment Record
     await AssignmentDB.create({
@@ -313,5 +371,3 @@ export const dispatchDriverToRide = async (req, res, next) => {
     next(err);
   }
 };
-
-
