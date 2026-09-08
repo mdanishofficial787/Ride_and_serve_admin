@@ -168,16 +168,206 @@ const normalizeRide = (r) => {
   };
 };
 
+const initialCustomerRides = [
+  {
+    _id: '6a9feb1a1e69d035472211f7',
+    id: 'REQ-8011',
+    requestId: 'REQ-8011',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    pickupLocation: 'karachi',
+    dropLocation: 'rawalpindi',
+    dropoffLocation: 'rawalpindi',
+    route: { summary: 'karachi ➔ rawalpindi' },
+    scheduledTime: '2026-09-08 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  },
+  {
+    _id: '6a9fe9231e69d035472211f6',
+    id: 'REQ-8010',
+    requestId: 'REQ-8010',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    pickupLocation: 'islamabad',
+    dropLocation: 'lahore',
+    dropoffLocation: 'lahore',
+    route: { summary: 'islamabad ➔ lahore' },
+    scheduledTime: '2026-09-08 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  },
+  {
+    _id: '6a9fe7801e69d035472211f5',
+    id: 'REQ-8009',
+    requestId: 'REQ-8009',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    pickupLocation: 'lahore',
+    dropLocation: 'islamabad',
+    dropoffLocation: 'islamabad',
+    route: { summary: 'lahore ➔ islamabad' },
+    scheduledTime: '2026-09-08 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  },
+  {
+    _id: '6a9fe3e31e69d035472211f4',
+    id: 'REQ-8008',
+    requestId: 'REQ-8008',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    pickupLocation: 'karachi',
+    dropLocation: 'rawalpindi',
+    dropoffLocation: 'rawalpindi',
+    route: { summary: 'karachi ➔ rawalpindi' },
+    scheduledTime: '2026-09-08 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  },
+  {
+    _id: '6a9fe00ef5bc8b5739f389e7',
+    id: 'REQ-8007',
+    requestId: 'REQ-8007',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    pickupLocation: 'lahore',
+    dropLocation: 'islamabad',
+    dropoffLocation: 'islamabad',
+    route: { summary: 'lahore ➔ islamabad' },
+    scheduledTime: '2026-09-08 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  },
+  {
+    _id: '6a9fd742f5bc8b5739f389e6',
+    id: 'REQ-8006',
+    requestId: 'REQ-8006',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    pickupLocation: 'islamabad',
+    dropLocation: 'rawalpindi',
+    dropoffLocation: 'rawalpindi',
+    route: { summary: 'islamabad ➔ rawalpindi' },
+    scheduledTime: '2026-09-08 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  },
+  {
+    _id: '6a9fd321f5bc8b5739f389e5',
+    id: 'REQ-8005',
+    requestId: 'REQ-8005',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    pickupLocation: 'islamabad',
+    dropLocation: 'rawalpindi',
+    dropoffLocation: 'rawalpindi',
+    route: { summary: 'islamabad ➔ rawalpindi' },
+    scheduledTime: '2026-09-08 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  },
+  {
+    _id: '6a9fc5414cc38e98c14bf8ec',
+    id: 'REQ-8004',
+    requestId: 'REQ-8004',
+    customerName: 'abrar',
+    passengerName: 'abrar',
+    passengerPhone: '+92 300 1234567',
+    pickupLocation: 'Rawalpindi',
+    dropLocation: 'Islamabad',
+    dropoffLocation: 'Islamabad',
+    route: { summary: 'Rawalpindi ➔ Islamabad' },
+    scheduledTime: '2026-09-01 08:00 AM',
+    vehicleType: 'Executive',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'ASSIGNED'
+  },
+  {
+    _id: '6a9fc5414cc38e98c14bf8eb',
+    id: 'REQ-8003',
+    requestId: 'REQ-8003',
+    customerName: 'Khawar Riaz',
+    passengerName: 'Khawar Riaz',
+    passengerPhone: '+92 300 1234567',
+    pickupLocation: 'Islamabad',
+    dropLocation: 'Lahore',
+    dropoffLocation: 'Lahore',
+    route: { summary: 'Islamabad ➔ Lahore' },
+    scheduledTime: '2026-09-01 08:00 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'ASSIGNED'
+  },
+  {
+    _id: '6a9fc5414cc38e98c14bf8ea',
+    id: 'REQ-8002',
+    requestId: 'REQ-8002',
+    customerName: 'Husnain Ahmed',
+    passengerName: 'Husnain Ahmed',
+    passengerPhone: '+92 300 1234567',
+    pickupLocation: 'Islamabad',
+    dropLocation: 'Rawalpindi',
+    dropoffLocation: 'Rawalpindi',
+    route: { summary: 'Islamabad ➔ Rawalpindi' },
+    scheduledTime: '2026-09-01 08:00 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  },
+  {
+    _id: '6a9fc5414cc38e98c14bf8e9',
+    id: 'REQ-8001',
+    requestId: 'REQ-8001',
+    customerName: 'Sohaib baig',
+    passengerName: 'Sohaib baig',
+    passengerPhone: '+92 300 1234567',
+    pickupLocation: 'Faisalabad',
+    dropLocation: 'Sargodha',
+    dropoffLocation: 'Sargodha',
+    route: { summary: 'Faisalabad ➔ Sargodha' },
+    scheduledTime: '2026-09-01 08:00 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    status: 'Pending Dispatch'
+  }
+];
+
 const RideDispatch = () => {
   const [activeMainTab, setActiveMainTab] = useState('requests'); // 'requests' | 'driver-panel'
-  const [rideRequests, setRideRequests] = useState([]);
+  const [rideRequests, setRideRequests] = useState(initialCustomerRides);
   const rides = rideRequests;
   const setRides = setRideRequests;
   const [availableDriversLocal, setAvailableDriversLocal] = useState([]);
   const [selectedRide, setSelectedRide] = useState(null);
   const [viewPassengerModal, setViewPassengerModal] = useState(null);
   const [viewDriverModal, setViewDriverModal] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [viewMode, setViewMode] = useState('table'); // 'table' or 'grid'
   
   // Filtering state for Driver Selection
@@ -193,66 +383,51 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // 1. Ultra-resilient Parallel Data fetching from backend and mobile URL
+  // 1. Robust data fetching from backend /api/rides
   const loadRides = useCallback(async () => {
     try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 800);
-
+      let list = [];
       const endpoints = [
         '/api/rides',
-        `${ADMIN_5000}/api/rides`,
         'http://localhost:5000/api/rides',
-        'http://127.0.0.1:5000/api/rides',
-        'http://localhost:3000/api/rides'
+        `${ADMIN_5000}/api/rides`,
+        'http://127.0.0.1:5000/api/rides'
       ];
 
-      const fetchPromises = endpoints.map(url =>
-        fetch(url)
-          .then(async res => {
-            if (!res.ok) return null;
-            return await res.json();
-          })
-          .catch(() => null)
-      );
+      for (const url of endpoints) {
+        try {
+          const res = await fetch(url);
+          if (res.ok) {
+            const data = await res.json();
+            const rawList = Array.isArray(data.data) 
+              ? data.data 
+              : (Array.isArray(data.rides) 
+                  ? data.rides 
+                  : (Array.isArray(data) 
+                      ? data 
+                      : (data.data?.rides || [])));
+            if (Array.isArray(rawList) && rawList.length > 0) {
+              list = rawList;
+              break;
+            }
+          }
+        } catch (e) {}
+      }
 
-      // Mobile IP attempt in parallel
-      fetchPromises.push(
-        fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal })
-          .then(async res => {
-            if (!res.ok) return null;
-            return await res.json();
-          })
-          .catch(() => null)
-      );
+      if (Array.isArray(list) && list.length > 0) {
+        const idMap = new Map();
+        list.forEach(r => {
+          if (!r) return;
+          const key = String(r.requestId || r.id || r._id || r.rideId);
+          if (!idMap.has(key)) {
+            idMap.set(key, r);
+          }
+        });
 
-      const results = await Promise.all(fetchPromises);
-      clearTimeout(tid);
-
-      const combined = [];
-      results.forEach(data => {
-        if (!data) return;
-        const list = (data.success && Array.isArray(data.data))
-          ? data.data
-          : (Array.isArray(data.data) ? data.data : (data.data?.rides || data.rides || (Array.isArray(data) ? data : [])));
-        if (Array.isArray(list) && list.length > 0) {
-          combined.push(...list);
+        const uniqueRides = Array.from(idMap.values());
+        if (uniqueRides.length > 0) {
+          setRideRequests(uniqueRides);
         }
-      });
-
-      // De-duplicate by requestId || id || _id
-      const idMap = new Map();
-      combined.forEach(r => {
-        if (!r) return;
-        const key = String(r.requestId || r.id || r._id || r.rideId);
-        if (!idMap.has(key)) {
-          idMap.set(key, r);
-        }
-      });
-
-      const uniqueRides = Array.from(idMap.values());
-      if (uniqueRides.length > 0) {
-        setRideRequests(uniqueRides);
       }
     } catch (err) {
       console.error('Fetch error:', err);
