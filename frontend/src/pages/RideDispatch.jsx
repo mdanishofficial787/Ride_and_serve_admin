@@ -6,12 +6,12 @@ import {
   Smartphone, Navigation, RefreshCw, Send, CheckCircle2, AlertCircle, Radio
 } from 'lucide-react';
 import LocationAutocomplete from '../components/LocationAutocomplete';
-import { BACKEND_URL, RideAPI } from '../utils/api';
+import { RideAPI } from '../utils/api';
 import './RideDispatch.css';
 
-const SOCKET_SERVER_URL = (typeof window !== 'undefined' && window.location.hostname === 'localhost')
-  ? 'http://localhost:3000'
-  : (BACKEND_URL || 'http://localhost:5000');
+const BACKEND_URL = 'http://192.168.88.132:3000';
+const SOCKET_SERVER_URL = 'http://192.168.88.132:3000';
+
 
 const formatRouteString = (rt) => {
   if (!rt) return '';
@@ -162,18 +162,18 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // 1. Fetch rides from backend API
+  // 1. Fetch rides from backend API (http://192.168.88.132:3000/api/rides)
   const fetchRides = useCallback(async () => {
     try {
-      let res = await fetch(`${SOCKET_SERVER_URL}/api/rides`).catch(() => null);
+      let res = await fetch('http://192.168.88.132:3000/api/rides').catch(() => null);
       if (!res || !res.ok) {
-        res = await fetch(`${BACKEND_URL}/api/rides`).catch(() => null);
+        res = await fetch('http://localhost:3000/api/rides').catch(() => null);
       }
       if (!res || !res.ok) {
-        res = await fetch(`${BACKEND_URL}/api/ride/pending`).catch(() => null);
+        res = await fetch('http://localhost:5000/api/rides').catch(() => null);
       }
       if (!res || !res.ok) {
-        res = await fetch(`${BACKEND_URL}/api/requests`).catch(() => null);
+        res = await fetch('http://localhost:5000/api/ride/pending').catch(() => null);
       }
 
       if (res && res.ok) {
@@ -193,14 +193,17 @@ const RideDispatch = () => {
   const fetchDrivers = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
-      let drvRes = await fetch(`${SOCKET_SERVER_URL}/driver`).catch(() => null);
+      let drvRes = await fetch('http://192.168.88.132:3000/driver').catch(() => null);
       if (!drvRes || !drvRes.ok) {
-        drvRes = await fetch(`${BACKEND_URL}/admin/driver`, {
+        drvRes = await fetch('http://localhost:3000/driver').catch(() => null);
+      }
+      if (!drvRes || !drvRes.ok) {
+        drvRes = await fetch('http://localhost:5000/admin/driver', {
           headers: token ? { Authorization: `Bearer ${token}` } : {}
         }).catch(() => null);
       }
       if (!drvRes || !drvRes.ok) {
-        drvRes = await fetch(`${BACKEND_URL}/api/drivers`).catch(() => null);
+        drvRes = await fetch('http://localhost:5000/api/drivers').catch(() => null);
       }
 
       if (drvRes && drvRes.ok) {
@@ -248,7 +251,7 @@ const RideDispatch = () => {
     }
   }, []);
 
-  // 2. Real-time updates with Socket.IO and polling
+  // 2. Real-time updates with Socket.IO and 3-second polling
   useEffect(() => {
     fetchRides();
     fetchDrivers();
@@ -282,14 +285,15 @@ const RideDispatch = () => {
 
     socket.on('ride-update', () => fetchRides());
 
-    // 10s live polling fallback
-    const poll = setInterval(fetchRides, 10000);
+    // 3-second live polling to automatically sync mobile customer ride requests
+    const poll = setInterval(fetchRides, 3000);
 
     return () => {
       socket.disconnect();
       clearInterval(poll);
     };
   }, [fetchRides, fetchDrivers]);
+
 
   // Split pending vs assigned rides
   const pendingRides = useMemo(() => {

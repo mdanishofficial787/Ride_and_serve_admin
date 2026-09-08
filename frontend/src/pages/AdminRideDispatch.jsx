@@ -8,10 +8,8 @@ import io from 'socket.io-client';
 import { BACKEND_URL } from '../utils/api';
 import './RideDispatch.css';
 
-// Base URL: prioritizes http://localhost:3000, fallback to current backend URL
-const BASE_URL = (typeof window !== 'undefined' && window.location.hostname === 'localhost') 
-  ? 'http://localhost:3000' 
-  : (BACKEND_URL || 'http://localhost:5000');
+// Base URL: prioritizes http://192.168.88.132:3000, fallback to current backend URL
+const BASE_URL = 'http://192.168.88.132:3000';
 
 export default function AdminRideDispatch() {
   const [pendingRides, setPendingRides] = useState([]);
@@ -46,12 +44,13 @@ export default function AdminRideDispatch() {
       fetchPendingRides();
     });
 
-    const interval = setInterval(fetchPendingRides, 5000); // 5s live polling
+    const interval = setInterval(fetchPendingRides, 3000); // 3s live polling
     return () => {
       socket.disconnect();
       clearInterval(interval);
     };
   }, []);
+
 
 
   // 1. Fetch pending customer requests
