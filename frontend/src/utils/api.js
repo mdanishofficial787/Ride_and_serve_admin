@@ -1,8 +1,8 @@
 export const BACKEND_URL = (typeof window !== 'undefined' && (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'))
-  ? 'http://192.168.88.132:3000'
-  : (import.meta.env.VITE_BACKEND_URL || 'http://192.168.88.132:3000');
+  ? 'http://localhost:5000'
+  : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000');
 
-
+export const MOBILE_BACKEND_URL = 'http://192.168.88.132:3000';
 
 const API_BASE_URL = `${BACKEND_URL}/api`;
 
@@ -127,9 +127,23 @@ export const AssignmentAPI = {
 };
 
 export const RideAPI = {
-  // GET /api/rides - Fetch all rides (pending & assigned with counts) from port 3000, port 5000 /api/rides, or /api/requests
+  // GET /api/rides - Fetch all rides from 192.168.88.132:3000, localhost:3000, or localhost:5000
   getAllRides: async () => {
-    // 1. Try port 3000 with quick 800ms abort so it never hangs
+    // 1. Try mobile URL http://192.168.88.132:3000
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 1000);
+      const resMob = await fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal });
+      clearTimeout(tid);
+      if (resMob.ok) {
+        const dataMob = await resMob.json();
+        if (dataMob && (dataMob.rides || dataMob.data || Array.isArray(dataMob))) {
+          return dataMob;
+        }
+      }
+    } catch (e) {}
+
+    // 2. Try port 3000
     try {
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), 800);
@@ -141,11 +155,9 @@ export const RideAPI = {
           return data3000;
         }
       }
-    } catch (e) {
-      // Port 3000 offline
-    }
+    } catch (e) {}
 
-    // 2. Try main backend /api/rides
+    // 3. Try main backend /api/rides (port 5000)
     try {
       const resRides = await fetch(`${BACKEND_URL}/api/rides`);
       if (resRides.ok) {
@@ -154,7 +166,7 @@ export const RideAPI = {
       }
     } catch (e) {}
 
-    // 3. Fallback to /api/requests (database MongoDB requests)
+    // 4. Fallback to /api/requests (database MongoDB requests)
     try {
       const resReq = await fetch(`${BACKEND_URL}/api/requests`);
       if (resReq.ok) {
@@ -170,7 +182,21 @@ export const RideAPI = {
   dispatch: async (rideId, driverName, driverId = null) => {
     const payload = { driverName, driverId };
 
-    // 1. Try port 3000 with quick abort
+    // 1. Try mobile URL http://192.168.88.132:3000
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 1000);
+      const resMob = await fetch(`http://192.168.88.132:3000/api/rides/${rideId}/dispatch`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      if (resMob.ok) return await resMob.json();
+    } catch (e) {}
+
+    // 2. Try port 3000
     try {
       const ctrl = new AbortController();
       const tid = setTimeout(() => ctrl.abort(), 1000);
@@ -181,24 +207,20 @@ export const RideAPI = {
         signal: ctrl.signal
       });
       clearTimeout(tid);
-      if (res3000.ok) {
-        return await res3000.json();
-      }
+      if (res3000.ok) return await res3000.json();
     } catch (e) {}
 
-    // 2. Try main backend PATCH /api/rides/:id/dispatch
+    // 3. Try main backend PATCH /api/rides/:id/dispatch
     try {
       const patchRes = await fetch(`${BACKEND_URL}/api/rides/${rideId}/dispatch`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (patchRes.ok) {
-        return await patchRes.json();
-      }
+      if (patchRes.ok) return await patchRes.json();
     } catch (e) {}
 
-    // 3. Fallback to POST /api/ride/assign
+    // 4. Fallback to POST /api/ride/assign
     return request('/ride/assign', {
       method: 'POST',
       body: JSON.stringify({ rideId, driverId, remarks: `Dispatched to ${driverName}` })
@@ -211,14 +233,28 @@ export const RideAPI = {
     return request(`/ride/pending${query ? `?${query}` : ''}`);
   },
 
-  // POST /api/ride/assign - Assign selected driver to ride (Flutter App Integration)
+  // POST /api/ride/assign - Assign selected driver to ride
   assign: async (rideId, driverId, extraData = {}) => {
     const payload = { rideId, driverId, ...extraData };
 
-    // 1. Try port 3000 POST /api/ride/assign with quick abort
+    // 1. Try mobile URL http://192.168.88.132:3000
     try {
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 1200);
+      const tid = setTimeout(() => ctrl.abort(), 1000);
+      const resMob = await fetch('http://192.168.88.132:3000/api/ride/assign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      if (resMob.ok) return await resMob.json();
+    } catch (e) {}
+
+    // 2. Try port 3000
+    try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 1000);
       const res3000 = await fetch('http://localhost:3000/api/ride/assign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -226,24 +262,20 @@ export const RideAPI = {
         signal: ctrl.signal
       });
       clearTimeout(tid);
-      if (res3000.ok) {
-        return await res3000.json();
-      }
+      if (res3000.ok) return await res3000.json();
     } catch (e) {}
 
-    // 2. Try main backend POST /api/ride/assign
+    // 3. Try main backend POST /api/ride/assign
     try {
       const res = await fetch(`${BACKEND_URL}/api/ride/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (res.ok) {
-        return await res.json();
-      }
+      if (res.ok) return await res.json();
     } catch (e) {}
 
-    // 3. Fallback to POST /api/assignments
+    // 4. Fallback to POST /api/assignments
     return request('/assignments', {
       method: 'POST',
       body: JSON.stringify({ requestId: rideId, driverId, ...extraData })
@@ -256,9 +288,6 @@ export const RideAPI = {
     return request(`/ride/assigned${query ? `?${query}` : ''}`);
   },
 
-  // GET /api/ride/driver/:driverId - Fetch assigned rides for driver (Flutter / Driver Panel)
+  // GET /api/ride/driver/:driverId - Fetch assigned rides for driver
   getDriverRides: (driverId) => request(`/ride/driver/${driverId}`)
 };
-
-
-

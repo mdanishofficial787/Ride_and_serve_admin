@@ -9,15 +9,30 @@ import { BACKEND_URL } from '../utils/api';
 import './RideDispatch.css';
 
 // Base URL: prioritizes http://192.168.88.132:3000, fallback to current backend URL
+const formatDisplayId = (id) => {
+  if (!id) return 'REQ-8001';
+  const str = String(id);
+  if (str.startsWith('RIDE_') || str.startsWith('RIDE-')) {
+    const clean = str.replace('RIDE_', '').replace('RIDE-', '').split('.')[0];
+    return `RIDE-${clean.slice(-6)}`;
+  }
+  if (str.length > 14) {
+    return `REQ-${str.slice(-6).toUpperCase()}`;
+  }
+  return str;
+};
+
 const BASE_URL = 'http://192.168.88.132:3000';
 
 export default function AdminRideDispatch() {
+
   const [pendingRides, setPendingRides] = useState([]);
   const [drivers, setDrivers] = useState([]);
   const [selectedDriverMap, setSelectedDriverMap] = useState({});
   const [loading, setLoading] = useState(true);
   const [toastMessage, setToastMessage] = useState('');
   const [actionLoadingMap, setActionLoadingMap] = useState({});
+
 
   useEffect(() => {
     fetchPendingRides();
@@ -200,8 +215,11 @@ export default function AdminRideDispatch() {
                 {pendingRides.map((ride) => (
                   <tr key={ride._id || ride.requestId}>
                     <td>
-                      <span className="id-pill font-mono">{ride.requestId || ride._id}</span>
+                      <span className="id-pill font-mono" title={ride.requestId || ride._id}>
+                        {formatDisplayId(ride.requestId || ride._id)}
+                      </span>
                     </td>
+
                     <td>
                       <div className="passenger-table-cell">
                         <div className="avatar-circle">
