@@ -220,6 +220,8 @@ const RideDispatch = () => {
 
   useEffect(() => {
     fetchData();
+    const interval = setInterval(fetchData, 5000); // Live real-time polling every 5s
+    return () => clearInterval(interval);
   }, []);
 
   // Helper to find assigned rides for a specific driver
