@@ -110,13 +110,21 @@ const startServer = async () => {
     }
 
     if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
-      app.listen(PORT, () => {
+      const server = app.listen(PORT, () => {
         console.log('====================================================');
         console.log(`🚀 R&R Dispatcher Backend running on: http://localhost:${PORT}`);
         console.log(`📡 Driver APIs:      http://localhost:${PORT}/api/drivers`);
         console.log(`📡 Request APIs:     http://localhost:${PORT}/api/requests`);
         console.log(`📡 Assignment APIs:  http://localhost:${PORT}/api/assignments`);
         console.log('====================================================');
+      });
+
+      server.on('error', (err) => {
+        if (err.code === 'EADDRINUSE') {
+          console.error(`⚠️ [Server] Port ${PORT} is already in use by a background process. Please terminate old process or retry.`);
+        } else {
+          console.error('[Server] Listen error:', err);
+        }
       });
     }
   } catch (err) {
