@@ -31,6 +31,20 @@ const formatDriverCode = (id) => {
   return id;
 };
 
+const getPassengerName = (p) => {
+  if (!p) return 'Passenger';
+  if (typeof p === 'string') return p;
+  if (typeof p === 'object' && p.name) return p.name;
+  if (typeof p === 'object' && p.customerName) return p.customerName;
+  return 'Passenger';
+};
+
+const getPassengerInitial = (p) => {
+  const name = getPassengerName(p);
+  return (name && name.length > 0) ? name.charAt(0).toUpperCase() : 'P';
+};
+
+
 const RideDispatch = () => {
   const [activeMainTab, setActiveMainTab] = useState('requests'); // 'requests' | 'driver-panel'
   const [rideRequests, setRideRequests] = useState([]);
@@ -106,7 +120,9 @@ const RideDispatch = () => {
             _id: r._id || r.id,
             id: r.requestId || r.id || (r._id ? `REQ-${String(r._id).slice(-4).toUpperCase()}` : 'REQ-8000'),
             requestId: r.requestId || r.id || (r._id ? `REQ-${String(r._id).slice(-4).toUpperCase()}` : 'REQ-8000'),
-            passenger: {
+            passenger: pName,
+            passengerName: pName,
+            passengerObj: {
               name: pName,
               phone: pPhone,
               email: pEmail,
@@ -599,7 +615,7 @@ const RideDispatch = () => {
           </button>
           <div>
             <h1 className="page-title">Smart Driver Dispatch Console</h1>
-            <p className="page-subtitle">Matching passenger <strong>{selectedRide.passenger}</strong> with top compatible verified drivers</p>
+            <p className="page-subtitle">Matching passenger <strong>{getPassengerName(selectedRide.passenger)}</strong> with top compatible verified drivers</p>
           </div>
         </div>
       </div>
@@ -608,12 +624,12 @@ const RideDispatch = () => {
       <div className="dispatch-trip-banner glass-panel mb-3">
         <div className="trip-banner-passenger">
           <div className="passenger-avatar-box">
-            {selectedRide.passenger.charAt(0)}
+            {getPassengerInitial(selectedRide.passenger)}
           </div>
           <div>
             <div className="text-xs text-secondary">PASSENGER</div>
-            <strong className="passenger-name-text">{selectedRide.passenger}</strong>
-            <div className="text-xs text-secondary mt-0.5">{selectedRide.phone}</div>
+            <strong className="passenger-name-text">{getPassengerName(selectedRide.passenger)}</strong>
+            <div className="text-xs text-secondary mt-0.5">{selectedRide.phone || selectedRide.passengerObj?.phone || '+92 300 1234567'}</div>
           </div>
         </div>
 
@@ -1146,11 +1162,11 @@ const RideDispatch = () => {
             <div className="passenger-modal-body">
               <div className="passenger-info-band">
                 <div className="passenger-avatar-box">
-                  {viewPassengerModal.passenger.charAt(0)}
+                  {getPassengerInitial(viewPassengerModal.passenger)}
                 </div>
                 <div>
-                  <h4>{viewPassengerModal.passenger}</h4>
-                  <p className="text-secondary text-xs">{viewPassengerModal.phone} • {viewPassengerModal.gender}</p>
+                  <h4>{getPassengerName(viewPassengerModal.passenger)}</h4>
+                  <p className="text-secondary text-xs">{viewPassengerModal.phone || viewPassengerModal.passengerObj?.phone || '+92 300 1234567'} • {viewPassengerModal.gender || 'Male'}</p>
                 </div>
                 <span className={`status-badge ms-auto ${viewPassengerModal.status.toLowerCase().includes('pending') ? 'pending' : 'approved'}`}>
                   {viewPassengerModal.status}
