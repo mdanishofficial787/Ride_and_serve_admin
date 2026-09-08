@@ -11,16 +11,9 @@ import './RideDispatch.css';
 // Base URL: prioritizes http://192.168.88.132:3000, fallback to current backend URL
 const formatDisplayId = (id) => {
   if (!id) return 'REQ-8001';
-  const str = String(id);
-  if (str.startsWith('RIDE_') || str.startsWith('RIDE-')) {
-    const clean = str.replace('RIDE_', '').replace('RIDE-', '').split('.')[0];
-    return `RIDE-${clean.slice(-6)}`;
-  }
-  if (str.length > 14) {
-    return `REQ-${str.slice(-6).toUpperCase()}`;
-  }
-  return str;
+  return String(id);
 };
+
 
 const BASE_URL = 'http://192.168.88.132:3000';
 

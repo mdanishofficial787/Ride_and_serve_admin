@@ -37,25 +37,29 @@ export const formatRideRecord = (r) => {
     ? (typeof isPlain.fare === 'number' ? `AED ${isPlain.fare}` : String(isPlain.fare).startsWith('AED') || String(isPlain.fare).startsWith('Rs') ? String(isPlain.fare) : `Rs. ${isPlain.fare}`)
     : 'AED 45';
 
-  const isAssigned = isPlain.status === 'ASSIGNED' || isPlain.status === 'assigned' || !!isPlain.driver || !!isPlain.driverId || !!isPlain.assignedDriverDetails?.name;
+  const isAssigned = isPlain.status === 'ASSIGNED' || isPlain.status === 'assigned' || (isPlain.status && String(isPlain.status).startsWith('Dispatched'));
 
   const dateStr = isPlain.date || (isPlain.createdAt ? new Date(isPlain.createdAt).toLocaleDateString() : 'Today');
   const timeStr = isPlain.timeToLeave || (isPlain.createdAt ? new Date(isPlain.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '08:00 AM');
 
   return {
     _id: isPlain._id,
-    id: isPlain.rideId || isPlain.requestId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
-    requestId: isPlain.rideId || isPlain.requestId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
+    id: isPlain.requestId || isPlain.rideId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
+    requestId: isPlain.requestId || isPlain.rideId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
     rideId: isPlain.rideId || isPlain.requestId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
     customerName: custName,
     customerPhone: custPhone,
     customerEmail: custEmail,
+    passengerName: custName,
+    passengerPhone: custPhone,
+    passengerEmail: custEmail,
     passenger: {
       name: custName,
       phone: custPhone,
       email: custEmail,
       gender: cust.gender || isPlain.gender || 'Male'
     },
+
     pickupLocation: pickup,
     dropLocation: drop,
     dropoffLocation: drop,

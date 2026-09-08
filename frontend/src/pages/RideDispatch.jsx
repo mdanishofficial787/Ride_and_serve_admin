@@ -36,39 +36,35 @@ const formatDriverCode = (id) => {
   return id;
 };
 
-const formatDisplayId = (id) => {
-  if (!id) return 'REQ-8001';
-  const str = String(id);
-  if (str.startsWith('RIDE_') || str.startsWith('RIDE-')) {
-    const clean = str.replace('RIDE_', '').replace('RIDE-', '').split('.')[0];
-    return `RIDE-${clean.slice(-6)}`;
-  }
-  if (str.length > 14) {
-    return `REQ-${str.slice(-6).toUpperCase()}`;
-  }
-  return str;
+const getDisplayId = (r) => {
+  if (!r) return 'REQ-8001';
+  if (r.requestId) return String(r.requestId);
+  if (r.rideId) return String(r.rideId);
+  if (r.id && String(r.id).startsWith('REQ-')) return String(r.id);
+  if (r._id) return `REQ-${String(r._id).slice(-4).toUpperCase()}`;
+  return 'REQ-8001';
 };
 
 const getPassengerName = (p) => {
-  if (!p) return 'Passenger';
+  if (!p) return 'Customer';
   if (typeof p === 'string') return p;
   if (typeof p === 'object' && p.name) return p.name;
   if (typeof p === 'object' && p.customerName) return p.customerName;
   if (typeof p === 'object' && p.fullName) return p.fullName;
-  return 'Passenger';
+  return 'Customer';
 };
 
 const getPassengerInitial = (p) => {
   const name = getPassengerName(p);
-  return (name && name.length > 0) ? name.charAt(0).toUpperCase() : 'P';
+  return (name && name.length > 0) ? name.charAt(0).toUpperCase() : 'C';
 };
 
 const normalizeRide = (r) => {
   if (!r) return null;
-  const pName = r.passengerName || r.passenger?.name || r.customerName || r.customer?.fullName || (typeof r.passenger === 'string' ? r.passenger : 'Customer');
-  const pPhone = r.passengerPhone || r.passenger?.phone || r.customerPhone || r.customer?.PhoneNumber || r.phone || '+92 300 1234567';
-  const pEmail = r.passengerEmail || r.passenger?.email || r.customerEmail || r.customer?.Email || r.email || '';
-  const pGender = r.passengerGender || r.passenger?.gender || r.gender || 'Male';
+  const pName = r.passengerName || r.customerName || r.passenger?.name || r.customer?.fullName || (typeof r.passenger === 'string' ? r.passenger : 'Customer');
+  const pPhone = r.passengerPhone || r.customerPhone || r.passenger?.phone || r.customer?.PhoneNumber || r.phone || '+92 300 1234567';
+  const pEmail = r.passengerEmail || r.customerEmail || r.passenger?.email || r.customer?.Email || r.email || '';
+  const pGender = r.passengerGender || r.gender || r.passenger?.gender || 'Male';
 
   const pickup = typeof r.pickupLocation === 'object' && r.pickupLocation?.address
     ? r.pickupLocation.address
@@ -105,16 +101,18 @@ const normalizeRide = (r) => {
 
   const fareFmt = r.fareFormatted || (r.fare !== undefined && r.fare !== null ? (typeof r.fare === 'number' ? `AED ${r.fare}` : String(r.fare)) : 'Rs. 9,500');
 
-  const isAssigned = r.status === 'ASSIGNED' || r.status === 'assigned' || (r.status && String(r.status).startsWith('Dispatched')) || !!r.driver || !!r.assignedDriverDetails?.name;
+  const isAssigned = r.status === 'ASSIGNED' || r.status === 'assigned' || (r.status && String(r.status).startsWith('Dispatched'));
   const statusStr = isAssigned ? 'ASSIGNED' : (r.status === 'Visible' || r.status === 'PENDING' || r.status === 'pending' ? 'Pending Dispatch' : (r.status || 'Pending Dispatch'));
+
+  const realId = getDisplayId(r);
 
   return {
     _id: r._id || r.id,
-    id: r.requestId || r.rideId || r.id || (r._id ? `REQ-${String(r._id).slice(-4).toUpperCase()}` : 'REQ-8001'),
-    requestId: r.requestId || r.rideId || r.id || (r._id ? `REQ-${String(r._id).slice(-4).toUpperCase()}` : 'REQ-8001'),
-    rideId: r.rideId || r.requestId || r.id || (r._id ? `REQ-${String(r._id).slice(-4).toUpperCase()}` : 'REQ-8001'),
+    id: realId,
+    requestId: realId,
+    rideId: r.rideId || realId,
     rawId: r.requestId || r.rideId || r._id,
-    displayId: formatDisplayId(r.requestId || r.rideId || r._id),
+    displayId: realId,
     passengerName: pName,
     passengerPhone: pPhone,
     passengerEmail: pEmail,
@@ -193,55 +191,80 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // 1. Fetch live rides from backend API (with fast multi-host fallback)
+  // 1. Fetch live rides from mobile endpoint http://192.168.88.132:3000/api/rides AND database backend
   const fetchRides = useCallback(async () => {
     try {
-      let res = null;
+      const combined = [];
 
-      // Try Mobile IP first with quick timeout
+      // A) Primary: Fetch from http://192.168.88.132:3000/api/rides as requested
       try {
         const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 1200);
-        res = await fetch(`${MOBILE_URL}/api/rides`, { signal: ctrl.signal });
+        const tid = setTimeout(() => ctrl.abort(), 1500);
+        const mobRes = await fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal });
         clearTimeout(tid);
+        if (mobRes.ok) {
+          const mobData = await mobRes.json();
+          const list = mobData.data?.rides || mobData.rides || (Array.isArray(mobData.data) ? mobData.data : (Array.isArray(mobData) ? mobData : []));
+          if (Array.isArray(list) && list.length > 0) {
+            combined.push(...list);
+          }
+        }
       } catch (e) {}
 
-      // Fallback 1: localhost:3000
-      if (!res || !res.ok) {
+      // B) Database backend (port 5000)
+      try {
+        const dbRes = await fetch(`${ADMIN_5000}/api/rides`);
+        if (dbRes.ok) {
+          const dbData = await dbRes.json();
+          const list = dbData.data?.rides || dbData.rides || (Array.isArray(dbData.data) ? dbData.data : (Array.isArray(dbData) ? dbData : []));
+          if (Array.isArray(list) && list.length > 0) {
+            combined.push(...list);
+          }
+        }
+      } catch (e) {}
+
+      // C) Local port 3000 fallback
+      if (combined.length === 0) {
         try {
-          const ctrl = new AbortController();
-          const tid = setTimeout(() => ctrl.abort(), 1000);
-          res = await fetch(`${LOCAL_3000}/api/rides`, { signal: ctrl.signal });
-          clearTimeout(tid);
+          const res3000 = await fetch(`${LOCAL_3000}/api/rides`);
+          if (res3000.ok) {
+            const data3000 = await res3000.json();
+            const list = data3000.data?.rides || data3000.rides || (Array.isArray(data3000.data) ? data3000.data : (Array.isArray(data3000) ? data3000 : []));
+            if (Array.isArray(list) && list.length > 0) {
+              combined.push(...list);
+            }
+          }
         } catch (e) {}
       }
 
-      // Fallback 2: localhost:5000 /api/rides
-      if (!res || !res.ok) {
-        try {
-          res = await fetch(`${ADMIN_5000}/api/rides`);
-        } catch (e) {}
-      }
+      // De-duplicate by ID
+      const map = new Map();
+      combined.forEach(r => {
+        if (!r) return;
+        const key = String(r._id || r.requestId || r.rideId || r.id);
+        if (!map.has(key)) {
+          map.set(key, r);
+        }
+      });
 
-      // Fallback 3: localhost:5000 /api/ride/pending
-      if (!res || !res.ok) {
-        try {
-          res = await fetch(`${ADMIN_5000}/api/ride/pending`);
-        } catch (e) {}
-      }
+      const uniqueList = Array.from(map.values());
+      const normalized = uniqueList.map(normalizeRide).filter(Boolean);
 
-      if (res && res.ok) {
-        const data = await res.json();
-        const rawList = data.data?.rides || data.data?.requests || (Array.isArray(data.data) ? data.data : (data.rides || data.requests || (Array.isArray(data) ? data : [])));
-        const normalized = (Array.isArray(rawList) ? rawList : []).map(normalizeRide).filter(Boolean);
-        setRides(normalized);
-      }
+      // Sort newest requests first
+      normalized.sort((a, b) => {
+        const timeA = new Date(a.createdAt || a.date || 0).getTime();
+        const timeB = new Date(b.createdAt || b.date || 0).getTime();
+        return timeB - timeA;
+      });
+
+      setRides(normalized);
     } catch (err) {
       console.error('Fetch rides error:', err);
     } finally {
       setLoading(false);
     }
   }, []);
+
 
   // Fetch Drivers from Admin Backend (Port 5000)
   const fetchDrivers = useCallback(async () => {
