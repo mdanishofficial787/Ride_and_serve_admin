@@ -1,6 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
+import { createServer } from 'http';
+import { Server as SocketIOServer } from 'socket.io';
 import { connectDB } from './config/db.js';
 import driverRoutes from './routes/driverRoutes.js';
 import requestRoutes from './routes/requestRoutes.js';
@@ -8,7 +10,6 @@ import assignmentRoutes from './routes/assignmentRoutes.js';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler.js';
 import { sendSuccess } from './middleware/responseHandler.js';
 import { DriverDB } from './models/dbAdapter.js';
-import { seedDatabase } from './seed/seedData.js';
 import adminAuthRoutes from './routes/adminAuthRoutes.js';
 import adminDriverRoutes from './routes/adminDriverRoutes.js';
 import adminVehicleRoutes from './routes/adminVehicleRoutes.js';
@@ -16,9 +17,37 @@ import adminVehicleRoutes from './routes/adminVehicleRoutes.js';
 dotenv.config();
 
 const app = express();
+const httpServer = createServer(app);
 const PORT = process.env.PORT || 5000;
 
-// Middleware
+// Socket.IO setup with CORS for all localhost origins
+export const io = new SocketIOServer(httpServer, {
+  cors: {
+    origin: ['http://localhost:3000', 'http://localhost:5000', 'http://localhost:5173', 'http://localhost:4173', 'http://127.0.0.1:5173', '*'],
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE'],
+    credentials: false
+  },
+  transports: ['websocket', 'polling']
+});
+
+io.on('connection', (socket) => {
+  console.log(`[Socket.IO] Client connected: ${socket.id}`);
+
+  socket.on('disconnect', () => {
+    console.log(`[Socket.IO] Client disconnected: ${socket.id}`);
+  });
+
+  // Admin joins a room to receive ride updates
+  socket.on('join-admin', () => {
+    socket.join('admin-room');
+    console.log(`[Socket.IO] Admin joined room: ${socket.id}`);
+  });
+});
+
+// Make io accessible globally for controllers
+app.set('io', io);
+
+// CORS Middleware
 app.use(cors({
   origin: '*',
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -47,8 +76,9 @@ app.get('/', (req, res) => {
       driverStats: '/api/drivers/stats',
       availableDrivers: '/api/drivers/available',
       requests: '/api/requests',
-      pendingRides: '/api/requests/pending',
+      pendingRides: '/api/ride/pending',
       requestStats: '/api/requests/stats',
+      allRides: '/api/rides',
       assignments: '/api/assignments'
     }
   }, 'R&R Dispatcher API is active and running');
@@ -70,7 +100,7 @@ app.use('/api/rides', rideRoutes);
 import adminPasswordResetRoutes from './routes/adminPasswordResetRoutes.js';
 import adminDriverRatingRoutes from './routes/adminDriverRatingRoutes.js';
 
-// New Admin Panel Verification API Routes
+// Admin Panel Verification API Routes
 app.use('/admin/auth', adminAuthRoutes);
 app.use('/admin/driver', adminDriverRoutes);
 app.use('/admin/vehicle', adminVehicleRoutes);
@@ -81,17 +111,7 @@ app.use('/admin/ratings', adminDriverRatingRoutes);
 app.use(notFoundHandler);
 app.use(errorHandler);
 
-// Serverless database connector middleware
-app.use(async (req, res, next) => {
-  try {
-    await connectDB();
-  } catch (e) {
-    console.error('[DB] Serverless connection error:', e);
-  }
-  next();
-});
-
-// Start Server (Local vs Serverless)
+// Start Server
 const startServer = async () => {
   try {
     await connectDB();
@@ -110,16 +130,18 @@ const startServer = async () => {
     }
 
     if (process.env.VERCEL !== '1' && !process.env.NOW_REGION) {
-      const server = app.listen(PORT, () => {
+      httpServer.listen(PORT, () => {
         console.log('====================================================');
         console.log(`🚀 R&R Dispatcher Backend running on: http://localhost:${PORT}`);
-        console.log(`📡 Driver APIs:      http://localhost:${PORT}/api/drivers`);
-        console.log(`📡 Request APIs:     http://localhost:${PORT}/api/requests`);
-        console.log(`📡 Assignment APIs:  http://localhost:${PORT}/api/assignments`);
+        console.log(`🔌 Socket.IO enabled at:              http://localhost:${PORT}`);
+        console.log(`📡 All Rides API:     http://localhost:${PORT}/api/rides`);
+        console.log(`📡 Pending Rides API: http://localhost:${PORT}/api/ride/pending`);
+        console.log(`📡 Driver APIs:       http://localhost:${PORT}/api/drivers`);
+        console.log(`📡 Assign Ride:       POST http://localhost:${PORT}/api/ride/assign`);
         console.log('====================================================');
       });
 
-      server.on('error', (err) => {
+      httpServer.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
           console.error(`⚠️ [Server] Port ${PORT} is already in use by a background process. Please terminate old process or retry.`);
         } else {
