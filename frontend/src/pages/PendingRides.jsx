@@ -40,16 +40,16 @@ const PendingRides = () => {
         res = await fetch(`${BACKEND_URL}/api/requests/pending`);
       }
       const data = await res.json();
-      const rawList = Array.isArray(data.data) ? data.data : (data.data?.requests || []);
+      const rawList = data.data?.rides || data.data?.requests || (Array.isArray(data.data) ? data.data : (data.rides || []));
       if (data.success && rawList.length > 0) {
         const mapped = rawList.map(r => ({
           _id: r._id,
-          id: r.requestId || r._id,
-          passenger: r.customerName || 'Passenger',
-          route: `${r.pickupLocation} -> ${r.dropLocation}`,
-          date: `${r.date || ''} ${r.timeToLeave || ''}`.trim() || 'Today',
+          id: r.requestId || r.rideId || r._id,
+          passenger: r.customerName || r.passengerName || r.passenger?.name || 'Passenger',
+          route: typeof r.route === 'object' && r.route?.summary ? r.route.summary : `${r.pickupLocation} -> ${r.dropLocation || r.dropoffLocation}`,
+          date: `${r.date || ''} ${r.timeToLeave || ''}`.trim() || r.scheduledTime || 'Today',
           driver: r.assignedDriverDetails?.name || null,
-          fare: r.fare || 'Rs. 8,500',
+          fare: r.fareFormatted || r.fare || 'Rs. 8,500',
           status: r.status,
           isOverdue: r.isOverdue || false,
           lastUpdated: 'Just now',
@@ -64,7 +64,10 @@ const PendingRides = () => {
 
   useEffect(() => {
     fetchPendingRides();
+    const interval = setInterval(fetchPendingRides, 5000);
+    return () => clearInterval(interval);
   }, []);
+
 
   // Rejection / Investigation Modal State
   const [modalState, setModalState] = useState({
