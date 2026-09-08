@@ -125,47 +125,76 @@ export const AssignmentAPI = {
 };
 
 export const RideAPI = {
-  // GET /api/rides - Fetch all rides (pending & assigned with counts) from port 3000 or fallback 5000
+  // GET /api/rides - Fetch all rides (pending & assigned with counts) from port 3000, port 5000 /api/rides, or /api/requests
   getAllRides: async () => {
-    // 1. Try port 3000 first (as specified)
+    // 1. Try port 3000 with quick 800ms abort so it never hangs
     try {
-      const res3000 = await fetch('http://localhost:3000/api/rides');
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 800);
+      const res3000 = await fetch('http://localhost:3000/api/rides', { signal: ctrl.signal });
+      clearTimeout(tid);
       if (res3000.ok) {
-        return await res3000.json();
+        const data3000 = await res3000.json();
+        if (data3000 && (data3000.rides || data3000.data || Array.isArray(data3000))) {
+          return data3000;
+        }
       }
     } catch (e) {
-      // Port 3000 offline, try main backend
+      // Port 3000 offline
     }
 
-    // 2. Fallback to main BACKEND_URL /api/rides
-    return request('/rides');
+    // 2. Try main backend /api/rides
+    try {
+      const resRides = await fetch(`${BACKEND_URL}/api/rides`);
+      if (resRides.ok) {
+        const dataRides = await resRides.json();
+        if (dataRides?.success) return dataRides;
+      }
+    } catch (e) {}
+
+    // 3. Fallback to /api/requests (database MongoDB requests)
+    try {
+      const resReq = await fetch(`${BACKEND_URL}/api/requests`);
+      if (resReq.ok) {
+        const dataReq = await resReq.json();
+        return dataReq;
+      }
+    } catch (e) {}
+
+    return request('/requests');
   },
 
   // PATCH /api/rides/:id/dispatch - Dispatch Driver to Ride (e.g. { driverName: "Ali Khan" })
   dispatch: async (rideId, driverName, driverId = null) => {
     const payload = { driverName, driverId };
 
-    // 1. Try port 3000 first
+    // 1. Try port 3000 with quick abort
     try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 1000);
       const res3000 = await fetch(`http://localhost:3000/api/rides/${rideId}/dispatch`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+        signal: ctrl.signal
+      });
+      clearTimeout(tid);
+      if (res3000.ok) {
+        return await res3000.json();
+      }
+    } catch (e) {}
+
+    // 2. Try main backend PATCH /api/rides/:id/dispatch
+    try {
+      const patchRes = await fetch(`${BACKEND_URL}/api/rides/${rideId}/dispatch`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (res3000.ok) {
-        return await res3000.json();
+      if (patchRes.ok) {
+        return await patchRes.json();
       }
-    } catch (e) {
-      // Port 3000 offline, try main backend
-    }
-
-    // 2. Fallback to main BACKEND_URL
-    const patchRes = await request(`/rides/${rideId}/dispatch`, {
-      method: 'PATCH',
-      body: JSON.stringify(payload)
-    });
-
-    if (patchRes.success) return patchRes;
+    } catch (e) {}
 
     // 3. Fallback to POST /api/ride/assign
     return request('/ride/assign', {

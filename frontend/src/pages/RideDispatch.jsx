@@ -63,8 +63,18 @@ const RideDispatch = () => {
       setLoading(true);
       const token = localStorage.getItem('admin_token');
       
-      // 1. Make GET /api/rides (prioritizing http://localhost:3000/api/rides)
-      const ridesRes = await RideAPI.getAllRides().catch(() => null);
+      // 1. Make GET /api/rides (or fallback to /api/requests)
+      let ridesRes = await RideAPI.getAllRides().catch(() => null);
+
+      let rawList = ridesRes?.rides || ridesRes?.data?.rides || ridesRes?.data?.requests || (Array.isArray(ridesRes?.data) ? ridesRes.data : (Array.isArray(ridesRes) ? ridesRes : []));
+
+      if (!rawList || rawList.length === 0) {
+        const fbRes = await fetch(`${BACKEND_URL}/api/requests`).catch(() => null);
+        if (fbRes && fbRes.ok) {
+          const fbData = await fbRes.json();
+          rawList = fbData?.data?.requests || fbData?.data || [];
+        }
+      }
 
       // 2. Fetch Drivers
       const drvRes = await fetch(`${BACKEND_URL}/admin/driver`, {
@@ -72,9 +82,6 @@ const RideDispatch = () => {
       }).catch(() => null);
 
       const drvData = drvRes && drvRes.ok ? await drvRes.json() : { success: false };
-
-      // Parse rides payload from response
-      const rawList = ridesRes?.rides || ridesRes?.data?.rides || ridesRes?.data?.requests || (Array.isArray(ridesRes?.data) ? ridesRes.data : (Array.isArray(ridesRes) ? ridesRes : []));
       
       if (rawList && rawList.length > 0) {
         const mappedAll = rawList.map(r => {
