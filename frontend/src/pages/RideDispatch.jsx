@@ -170,7 +170,9 @@ const normalizeRide = (r) => {
 
 const RideDispatch = () => {
   const [activeMainTab, setActiveMainTab] = useState('requests'); // 'requests' | 'driver-panel'
-  const [rides, setRides] = useState([]);
+  const [rideRequests, setRideRequests] = useState([]);
+  const rides = rideRequests;
+  const setRides = setRideRequests;
   const [availableDriversLocal, setAvailableDriversLocal] = useState([]);
   const [selectedRide, setSelectedRide] = useState(null);
   const [viewPassengerModal, setViewPassengerModal] = useState(null);
@@ -191,96 +193,83 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // 1. Fetch live rides from mobile endpoint http://192.168.88.132:3000/api/rides AND database backend
+  // Fetch live rides from backend API on host laptop (http://192.168.88.132:3000/api/rides)
   const fetchRides = useCallback(async () => {
     try {
-      const combined = [];
+      const res = await fetch('http://192.168.88.132:3000/api/rides');
+      const data = await res.json();
+      const rawList = (data.success && Array.isArray(data.data)) 
+        ? data.data 
+        : (Array.isArray(data.data) ? data.data : (data.data?.rides || data.rides || (Array.isArray(data) ? data : [])));
 
-      // A) Primary: Fetch from http://192.168.88.132:3000/api/rides as requested
-      try {
-        const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 2500);
-        const mobRes = await fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal });
-        clearTimeout(tid);
-        if (mobRes.ok) {
-          const mobData = await mobRes.json();
-          const list = mobData.data?.rides || mobData.rides || mobData.data?.requests || mobData.requests || (Array.isArray(mobData.data) ? mobData.data : (Array.isArray(mobData) ? mobData : []));
-          if (Array.isArray(list) && list.length > 0) {
-            combined.push(...list);
-          }
-        }
-      } catch (e) {}
+      if (Array.isArray(rawList)) {
+        const mappedRides = rawList.map(item => {
+          const vCat = item.vehicleType || item.vehicle?.type || item.preferences?.vehicleCategory || item.vehiclePreference || 'Sedan';
+          const acReq = (item.acPreference || item.vehicle?.ac || (item.preferences?.acRequired !== false) || 'AC').toString().toUpperCase().includes('AC');
+          const fareStr = item.fareFormatted || (item.fare ? `Rs. ${Number(item.fare).toLocaleString()}` : 'Rs. 9,500');
+          const pName = item.passengerName || item.passenger?.name || item.customerName || 'Customer';
+          const pPhone = item.passengerPhone || item.passenger?.phone || item.customerPhone || '';
+          const pickup = typeof item.pickupLocation === 'object' ? (item.pickupLocation.address || '') : (item.pickupLocation || '');
+          const dropoff = typeof item.dropoffLocation === 'object' ? (item.dropoffLocation.address || '') : (item.dropoffLocation || item.dropLocation || '');
+          const routeStr = item.route?.summary || `${pickup} -> ${dropoff}`;
+          const timeStr = item.scheduledTime || `${item.startingFrom || ''} ${item.timeToReach || ''}`.trim() || item.date || 'Today';
+          const realId = item.requestId || item.id || (item._id ? (String(item._id).startsWith('REQ-') ? item._id : `REQ-${String(item._id).slice(-4).toUpperCase()}`) : 'REQ-8001');
 
-      // B) Database backend (port 5000)
-      try {
-        const dbRes = await fetch(`${ADMIN_5000}/api/rides`);
-        if (dbRes.ok) {
-          const dbData = await dbRes.json();
-          const list = dbData.data?.rides || dbData.rides || dbData.data?.requests || dbData.requests || (Array.isArray(dbData.data) ? dbData.data : (Array.isArray(dbData) ? dbData : []));
-          if (Array.isArray(list) && list.length > 0) {
-            combined.push(...list);
-          }
-        }
-      } catch (e) {}
-
-      // Fallback to /api/requests if needed
-      if (combined.length === 0) {
-        try {
-          const reqRes = await fetch(`${ADMIN_5000}/api/requests`);
-          if (reqRes.ok) {
-            const reqData = await reqRes.json();
-            const list = reqData.data?.requests || reqData.requests || (Array.isArray(reqData.data) ? reqData.data : []);
-            if (Array.isArray(list) && list.length > 0) {
-              combined.push(...list);
-            }
-          }
-        } catch (e) {}
+          return {
+            id: item.requestId || item.id || item._id,
+            mongoId: item.mongoId || item._id,
+            displayId: realId,
+            requestId: realId,
+            rideId: realId,
+            rawId: item.requestId || item.id || item._id,
+            _id: item.mongoId || item._id || realId,
+            passenger: pName,
+            passengerName: pName,
+            phone: pPhone,
+            passengerPhone: pPhone,
+            customerName: pName,
+            customerPhone: pPhone,
+            route: {
+              summary: routeStr,
+              pickup: pickup,
+              dropoff: dropoff,
+              pickupLocation: pickup,
+              dropLocation: dropoff,
+              passengers: item.route?.passengers || `${item.seatsNeeded || 1} Passenger(s)`
+            },
+            pickupLocation: pickup,
+            dropoffLocation: dropoff,
+            dropLocation: dropoff,
+            date: timeStr,
+            scheduledTime: timeStr,
+            fare: fareStr,
+            fareFormatted: fareStr,
+            status: item.status || 'Pending Dispatch',
+            vehicleType: vCat,
+            acPreference: acReq ? 'AC' : 'Non-AC',
+            vehicle: {
+              label: `${vCat} • ${acReq ? 'AC' : 'Non-AC'}`,
+              category: vCat,
+              ac: acReq
+            },
+            preferences: {
+              vehicleCategory: vCat,
+              acRequired: acReq
+            },
+            assignedDriverDetails: item.assignedDriverDetails,
+            driverId: item.driverId || item.driver
+          };
+        });
+        setRideRequests(mappedRides);
       }
-
-      // C) Local port 3000 fallback
-      if (combined.length === 0) {
-        try {
-          const res3000 = await fetch(`${LOCAL_3000}/api/rides`);
-          if (res3000.ok) {
-            const data3000 = await res3000.json();
-            const list = data3000.data?.rides || data3000.rides || data3000.data?.requests || data3000.requests || (Array.isArray(data3000.data) ? data3000.data : (Array.isArray(data3000) ? data3000 : []));
-            if (Array.isArray(list) && list.length > 0) {
-              combined.push(...list);
-            }
-          }
-        } catch (e) {}
-      }
-
-      // De-duplicate by ID
-      const map = new Map();
-      combined.forEach(r => {
-        if (!r) return;
-        const key = String(r._id || r.requestId || r.rideId || r.id);
-        if (!map.has(key)) {
-          map.set(key, r);
-        }
-      });
-
-      const uniqueList = Array.from(map.values());
-      const normalized = uniqueList.map(normalizeRide).filter(Boolean);
-
-      // Sort newest requests first
-      normalized.sort((a, b) => {
-        const timeA = new Date(a.createdAt || a.date || 0).getTime();
-        const timeB = new Date(b.createdAt || b.date || 0).getTime();
-        return timeB - timeA;
-      });
-
-      setRides(normalized);
     } catch (err) {
-      console.error('Fetch rides error:', err);
+      console.error("Error fetching live rides from backend:", err);
     } finally {
       setLoading(false);
     }
   }, []);
 
-
-  // Fetch Drivers from Admin Backend (Port 5000)
+  // Fetch Drivers from Admin Backend
   const fetchDrivers = useCallback(async () => {
     try {
       const token = localStorage.getItem('admin_token');
@@ -340,7 +329,7 @@ const RideDispatch = () => {
     }
   }, []);
 
-  // 2. Real-time updates with Socket.IO and 3-second polling
+  // 3. Permanent Live Fetch & Polling (Every 3 seconds)
   useEffect(() => {
     fetchRides();
     fetchDrivers();
@@ -358,30 +347,15 @@ const RideDispatch = () => {
         socket.emit('join-admin');
       });
 
-      socket.on('new-ride', (newRide) => {
-        const normalized = normalizeRide(newRide);
-        if (!normalized) return;
-        setRides(prev => {
-          if (prev.some(r => r._id === normalized._id || r.requestId === normalized.requestId)) return prev;
-          return [normalized, ...prev];
-        });
-      });
-
-      socket.on('ride-dispatched', (updated) => {
-        const normalized = normalizeRide(updated);
-        if (!normalized) return;
-        setRides(prev => prev.map(r => (r._id === normalized._id || r.requestId === normalized.requestId) ? { ...r, ...normalized } : r));
-      });
-
+      socket.on('new-ride', () => fetchRides());
+      socket.on('ride-dispatched', () => fetchRides());
       socket.on('ride-update', () => fetchRides());
     } catch (e) {}
 
-    // 3-second live polling to automatically sync mobile customer ride requests
-    const poll = setInterval(fetchRides, 3000);
-
+    const timer = setInterval(fetchRides, 3000);
     return () => {
       if (socket) socket.disconnect();
-      clearInterval(poll);
+      clearInterval(timer);
     };
   }, [fetchRides, fetchDrivers]);
 
