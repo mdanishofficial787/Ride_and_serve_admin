@@ -23,6 +23,14 @@ const formatRouteString = (rt) => {
   return String(rt);
 };
 
+const formatDriverCode = (id) => {
+  if (!id) return 'DRV-1000';
+  if (id.length > 14) {
+    return `DRV-${id.slice(-6).toUpperCase()}`;
+  }
+  return id;
+};
+
 const RideDispatch = () => {
   const [activeMainTab, setActiveMainTab] = useState('requests'); // 'requests' | 'driver-panel'
   const [rideRequests, setRideRequests] = useState([]);
@@ -686,8 +694,10 @@ const RideDispatch = () => {
                         </div>
                         <div className="driver-match-info">
                           <div className="d-flex align-items-center gap-2">
-                            <h4>{driver.personalInfo.name}</h4>
-                            <span className="driver-id-pill">{driver.id}</span>
+                            <h4>{driver.personalInfo?.name || 'Driver'}</h4>
+                            <span className="driver-id-pill font-mono" title={driver.id}>
+                              {formatDriverCode(driver.id)}
+                            </span>
                             {assignedTrips.length > 0 && (
                               <span className="active-dispatch-tag">
                                 ⚡ {assignedTrips.length} Active Trip
@@ -861,28 +871,34 @@ const RideDispatch = () => {
                 <div key={driver.id} className={`driver-panel-card glass-panel ${isOnTrip ? 'border-active-dispatch' : ''}`}>
                   {/* Card Header */}
                   <div className="driver-panel-card-header">
-                    <div className="d-flex align-items-center gap-3">
+                    <div className="driver-header-left">
                       <div className="driver-avatar-md">
-                        {driver.personalInfo.name.charAt(0)}
+                        {(driver.personalInfo?.name || 'D').charAt(0).toUpperCase()}
                       </div>
-                      <div>
-                        <div className="d-flex align-items-center gap-2">
-                          <h4 className="driver-name-heading">{driver.personalInfo.name}</h4>
-                          <span className="driver-id-pill">{driver.id}</span>
+                      <div className="driver-title-col">
+                        <div className="driver-name-row">
+                          <h4 className="driver-name-heading" title={driver.personalInfo?.name}>
+                            {driver.personalInfo?.name || 'Driver'}
+                          </h4>
+                          <span className="driver-id-pill font-mono" title={driver.id}>
+                            {formatDriverCode(driver.id)}
+                          </span>
                         </div>
-                        <div className="text-xs text-secondary mt-0.5">
-                          {driver.personalInfo.phone} • {driver.personalInfo.city}
+                        <div className="driver-meta-subtext">
+                          <span>{driver.personalInfo?.phone || 'N/A'}</span>
+                          <span className="meta-sep">•</span>
+                          <span>{driver.personalInfo?.city || 'Islamabad'}</span>
                         </div>
                       </div>
                     </div>
 
-                    <div className="d-flex flex-column align-items-end gap-1">
+                    <div className="driver-header-right">
                       <span className={`availability-pill ${isOnTrip ? 'on-trip' : 'available'}`}>
-                        {isOnTrip ? '● On Trip / Assigned' : '● Available'}
+                        {isOnTrip ? '● On Trip' : '● Available'}
                       </span>
                       <div className="rating-mini">
                         <Star size={12} fill="#F59E0B" color="#F59E0B" />
-                        <span>{driver.performance.rating}</span>
+                        <span>{driver.performance?.rating || 4.8}</span>
                       </div>
                     </div>
                   </div>

@@ -919,11 +919,13 @@
   gap: 1rem;
   padding: 0.85rem 1.25rem;
   border-radius: var(--radius-lg);
+  flex-wrap: wrap;
 }
 
 .driver-panel-filter-tabs {
   display: flex;
   gap: 0.4rem;
+  flex-wrap: wrap;
 }
 
 .panel-tab-btn {
@@ -952,7 +954,7 @@
 /* Driver Cards Grid */
 .driver-panel-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(380px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(330px, 1fr));
   gap: 1.25rem;
 }
 
@@ -975,33 +977,99 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
+  gap: 0.65rem;
+}
+
+.driver-header-left {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.driver-title-col {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+  flex: 1;
+}
+
+.driver-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 .driver-avatar-md {
-  width: 44px;
-  height: 44px;
+  width: 42px;
+  height: 42px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-hover));
   color: white;
-  font-size: 1.1rem;
+  font-size: 1.05rem;
   font-weight: 700;
   display: flex;
   align-items: center;
   justify-content: center;
+  flex-shrink: 0;
 }
 
 .driver-name-heading {
-  font-size: 1.02rem;
+  font-size: 0.96rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 130px;
+}
+
+.driver-id-pill {
+  font-size: 0.68rem;
+  font-weight: 700;
+  color: var(--accent-primary);
+  background: var(--accent-light);
+  padding: 0.12rem 0.4rem;
+  border-radius: 4px;
+  border: 1px solid rgba(59, 130, 246, 0.2);
+  white-space: nowrap;
+}
+
+.driver-meta-subtext {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.meta-sep {
+  color: var(--text-secondary);
+  opacity: 0.6;
+}
+
+.driver-header-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.3rem;
+  flex-shrink: 0;
 }
 
 .availability-pill {
-  font-size: 0.72rem;
+  font-size: 0.7rem;
   font-weight: 700;
-  padding: 0.2rem 0.6rem;
+  padding: 0.18rem 0.55rem;
   border-radius: 999px;
+  white-space: nowrap;
 }
 
 .availability-pill.available {
@@ -1019,8 +1087,8 @@
 .rating-mini {
   display: flex;
   align-items: center;
-  gap: 0.25rem;
-  font-size: 0.8rem;
+  gap: 0.2rem;
+  font-size: 0.78rem;
   font-weight: 700;
   color: var(--text-primary);
 }
@@ -1029,18 +1097,19 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
-  font-size: 0.82rem;
+  font-size: 0.8rem;
   color: var(--text-secondary);
   background: var(--bg-primary);
   padding: 0.5rem 0.75rem;
   border-radius: var(--radius-md);
   border: 1px solid var(--border-color);
+  flex-wrap: wrap;
 }
 
 .driver-vehicle-tag, .driver-ac-tag {
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 700;
-  padding: 0.15rem 0.45rem;
+  padding: 0.12rem 0.4rem;
   border-radius: 4px;
   background: rgba(37, 99, 235, 0.08);
   color: var(--accent-primary);
@@ -1500,4 +1569,219 @@
   color: #60A5FA;
   font-weight: 700;
 }
+
+/* ─────────────────────────────────────────────────────────────
+   DARK MODE OVERRIDES (FIXES CONTRAST & UI GLITCHES)
+   ───────────────────────────────────────────────────────────── */
+body.dark-mode .driver-panel-card {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .driver-panel-card.border-active-dispatch {
+  border-color: #10B981;
+  box-shadow: 0 4px 16px rgba(16, 185, 129, 0.2);
+}
+
+body.dark-mode .driver-name-heading {
+  color: #F8FAFC;
+}
+
+body.dark-mode .driver-id-pill {
+  background: rgba(59, 130, 246, 0.18);
+  color: #93C5FD;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+body.dark-mode .availability-pill.available {
+  background: rgba(16, 185, 129, 0.16);
+  color: #34D399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+body.dark-mode .availability-pill.on-trip {
+  background: rgba(245, 158, 11, 0.16);
+  color: #FBBF24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+}
+
+body.dark-mode .driver-vehicle-row {
+  background: #0F172A;
+  border-color: #334155;
+  color: #94A3B8;
+}
+
+body.dark-mode .driver-vehicle-tag,
+body.dark-mode .driver-ac-tag {
+  background: rgba(59, 130, 246, 0.2);
+  color: #60A5FA;
+}
+
+body.dark-mode .assigned-rides-subcontainer {
+  background: #0F172A;
+  border-color: #334155;
+}
+
+body.dark-mode .assigned-rides-title {
+  color: #94A3B8;
+}
+
+body.dark-mode .live-sync-indicator {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+}
+
+body.dark-mode .no-trips-box {
+  color: #64748B;
+}
+
+body.dark-mode .assigned-trip-item {
+  background: #1E293B;
+  border-color: #334155;
+  border-left-color: #10B981;
+}
+
+body.dark-mode .trip-route-info {
+  color: #F1F5F9;
+}
+
+body.dark-mode .trip-id-badge {
+  background: rgba(59, 130, 246, 0.2);
+  color: #93C5FD;
+}
+
+body.dark-mode .trip-status-badge {
+  background: rgba(16, 185, 129, 0.18);
+  color: #34D399;
+}
+
+body.dark-mode .driver-app-preview-btn {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+  border-color: rgba(59, 130, 246, 0.35);
+}
+
+body.dark-mode .driver-app-preview-btn:hover {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+body.dark-mode .driver-panel-controls {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .driver-panel-controls input {
+  background: #0F172A;
+  border-color: #334155;
+  color: #F8FAFC;
+}
+
+body.dark-mode .panel-tab-btn {
+  background: #0F172A;
+  border-color: #334155;
+  color: #94A3B8;
+}
+
+body.dark-mode .panel-tab-btn:hover {
+  background: #1E293B;
+  color: #FFFFFF;
+}
+
+body.dark-mode .panel-tab-btn.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+}
+
+body.dark-mode .panel-kpi-card {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+}
+
+body.dark-mode .bg-blue-light { background: rgba(59, 130, 246, 0.15); }
+body.dark-mode .bg-green-light { background: rgba(16, 185, 129, 0.15); }
+body.dark-mode .bg-purple-light { background: rgba(139, 92, 246, 0.15); }
+
+body.dark-mode .nav-tab-button {
+  background: var(--bg-secondary);
+  border-color: var(--border-color);
+  color: #94A3B8;
+}
+
+body.dark-mode .nav-tab-button:hover {
+  background: #334155;
+  color: #F8FAFC;
+}
+
+body.dark-mode .nav-tab-button.active {
+  background: #2563EB;
+  color: #FFFFFF;
+  border-color: #2563EB;
+}
+
+body.dark-mode .active-dispatch-tag {
+  background: rgba(245, 158, 11, 0.18);
+  color: #FBBF24;
+  border-color: rgba(245, 158, 11, 0.3);
+}
+
+body.dark-mode .view-panel-btn {
+  background: #0F172A;
+  border-color: #334155;
+  color: #94A3B8;
+}
+
+body.dark-mode .view-panel-btn:hover {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+  border-color: #2563EB;
+}
+
+body.dark-mode .view-mode-toggle {
+  background: #0F172A;
+  border-color: #334155;
+}
+
+body.dark-mode .view-toggle-btn {
+  color: #94A3B8;
+}
+
+body.dark-mode .view-toggle-btn.active {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
+body.dark-mode .clean-table th {
+  background: #1E293B;
+  color: #94A3B8;
+  border-bottom-color: #334155;
+}
+
+body.dark-mode .clean-table td {
+  border-bottom-color: #334155;
+  color: #F8FAFC;
+}
+
+body.dark-mode .clean-table tr:hover td {
+  background: rgba(255, 255, 255, 0.03);
+}
+
+body.dark-mode .fare-badge {
+  background: rgba(16, 185, 129, 0.15);
+  color: #34D399;
+  border-color: rgba(16, 185, 129, 0.3);
+}
+
+body.dark-mode .dispatch-action-btn {
+  background: rgba(59, 130, 246, 0.15);
+  color: #60A5FA;
+  border-color: #2563EB;
+}
+
+body.dark-mode .dispatch-action-btn:hover {
+  background: #2563EB;
+  color: #FFFFFF;
+}
+
 
