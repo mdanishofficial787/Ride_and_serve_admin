@@ -560,14 +560,16 @@ const RideDispatch = () => {
   // View 2: Driver Selection Screen with Smart Recommendations
   const renderDriverSelection = () => (
     <div className="driver-selection-container fade-in">
-      <div className="page-header">
-        <button className="back-btn" onClick={() => setSelectedRide(null)}>
-          <ChevronLeft size={18} />
-          <span>Back to Passenger Requests</span>
-        </button>
-        <div className="mt-2">
-          <h1 className="page-title">Smart Driver Dispatch</h1>
-          <p className="page-subtitle">Matching passenger <strong>{selectedRide.passenger}</strong> with top compatible drivers.</p>
+      <div className="page-header dispatch-selection-header">
+        <div className="d-flex align-items-center gap-3">
+          <button className="back-btn" onClick={() => setSelectedRide(null)}>
+            <ChevronLeft size={18} />
+            <span>Back to Requests</span>
+          </button>
+          <div>
+            <h1 className="page-title">Smart Driver Dispatch</h1>
+            <p className="page-subtitle">Matching passenger <strong>{selectedRide.passenger}</strong> with top compatible drivers</p>
+          </div>
         </div>
       </div>
 
@@ -690,10 +692,10 @@ const RideDispatch = () => {
                     <div className="driver-card-inner">
                       <div className="driver-match-main">
                         <div className="driver-avatar-lg">
-                          {driver.personalInfo.name.charAt(0)}
+                          {(driver.personalInfo?.name || 'D').charAt(0).toUpperCase()}
                         </div>
                         <div className="driver-match-info">
-                          <div className="d-flex align-items-center gap-2">
+                          <div className="driver-match-title-row">
                             <h4>{driver.personalInfo?.name || 'Driver'}</h4>
                             <span className="driver-id-pill font-mono" title={driver.id}>
                               {formatDriverCode(driver.id)}
@@ -717,7 +719,7 @@ const RideDispatch = () => {
                             <span className="tag seats-tag">{driver.vehicleInfo.seats} Seats</span>
                           </div>
                           <div className="match-reasons-row mt-1">
-                            {driver.matchTags?.map((tag, tIdx) => (
+                            {driver.matchTags?.filter(t => !t.includes('Active Assignment')).map((tag, tIdx) => (
                               <span key={tIdx} className="match-reason-chip">✓ {tag}</span>
                             ))}
                           </div>
@@ -743,7 +745,7 @@ const RideDispatch = () => {
 
                       <div className="driver-match-action">
                         <button 
-                          className="view-panel-btn mb-2" 
+                          className="view-panel-btn" 
                           onClick={() => setViewDriverModal(driver)}
                           title="Preview what driver sees in Flutter mobile app"
                         >
