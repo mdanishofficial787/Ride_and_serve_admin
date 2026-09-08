@@ -222,7 +222,39 @@ export const RequestDB = {
 
   async find(query = {}, sort = '-createdAt', skip = 0, limit = 50) {
     if (!isMemoryMode) {
-      return await RequestModel.find(query).populate('driverId').sort(sort).skip(skip).limit(limit);
+      const testList = await RequestModel.find(query).populate('driverId').sort(sort).skip(skip).limit(limit).lean();
+      try {
+        const client = mongoose.connection?.client;
+        if (client) {
+          const appReqs = await client.db('ride_and_serve').collection('riderequests').find({}).sort({ createdAt: -1 }).limit(limit).toArray();
+          const map = new Map();
+          testList.forEach(r => map.set(r.requestId || String(r._id), r));
+          appReqs.forEach(r => {
+            const key = r.requestId || String(r._id);
+            if (!map.has(key)) {
+              map.set(key, {
+                _id: r._id,
+                requestId: r.requestId,
+                customerName: r.passengerName || 'Customer',
+                passengerName: r.passengerName || 'Customer',
+                passengerPhone: r.passengerPhone || '',
+                pickupLocation: r.pickupLocation || '',
+                dropLocation: r.dropoffLocation || r.dropLocation || '',
+                dropoffLocation: r.dropoffLocation || r.dropLocation || '',
+                fare: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
+                fareFormatted: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
+                scheduledTime: (r.startingFrom ? `${r.startingFrom} ` : '') + (r.timeToReach || r.scheduleTime || '08:30 AM'),
+                status: r.status || 'Pending Dispatch',
+                vehiclePreference: r.vehicleType || 'Sedan',
+                acRequired: (r.acPreference || 'AC').toUpperCase().includes('AC'),
+                createdAt: r.createdAt || new Date()
+              });
+            }
+          });
+          return Array.from(map.values());
+        }
+      } catch (e) {}
+      return testList;
     }
     let list = memoryStore.requests.filter(r => matchQuery(r, query));
     list = sortList(list, sort);

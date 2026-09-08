@@ -193,20 +193,71 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // 1. Data fetching from http://192.168.88.132:3000/api/rides
+  // 1. Data fetching from http://192.168.88.132:3000/api/rides and admin database backend
   const loadRides = useCallback(async () => {
     try {
-      const res = await fetch('http://192.168.88.132:3000/api/rides');
-      const data = await res.json();
-      if (data.success && Array.isArray(data.data)) {
-        // Set all rides directly into state without strict string filter
-        setRideRequests(data.data);
-      } else if (Array.isArray(data.data?.rides)) {
-        setRideRequests(data.data.rides);
-      } else if (Array.isArray(data.rides)) {
-        setRideRequests(data.rides);
-      } else if (Array.isArray(data)) {
-        setRideRequests(data);
+      const combined = [];
+
+      // A) Primary: Try mobile host IP http://192.168.88.132:3000/api/rides (with 1.2s timeout)
+      try {
+        const ctrl = new AbortController();
+        const tid = setTimeout(() => ctrl.abort(), 1200);
+        const res = await fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal });
+        clearTimeout(tid);
+        if (res.ok) {
+          const data = await res.json();
+          const list = (data.success && Array.isArray(data.data))
+            ? data.data
+            : (Array.isArray(data.data) ? data.data : (data.data?.rides || data.rides || (Array.isArray(data) ? data : [])));
+          if (Array.isArray(list) && list.length > 0) {
+            combined.push(...list);
+          }
+        }
+      } catch (err) {}
+
+      // B) Admin Database Backend (port 5000 /api/rides - connects directly to MongoDB Atlas)
+      try {
+        const dbRes = await fetch(`${ADMIN_5000}/api/rides`);
+        if (dbRes.ok) {
+          const dbData = await dbRes.json();
+          const list = (dbData.success && Array.isArray(dbData.data))
+            ? dbData.data
+            : (Array.isArray(dbData.data) ? dbData.data : (dbData.data?.rides || dbData.rides || (Array.isArray(dbData) ? dbData : [])));
+          if (Array.isArray(list) && list.length > 0) {
+            combined.push(...list);
+          }
+        }
+      } catch (err) {}
+
+      // C) Port 3000 localhost fallback
+      if (combined.length === 0) {
+        try {
+          const res3000 = await fetch('http://localhost:3000/api/rides');
+          if (res3000.ok) {
+            const data3000 = await res3000.json();
+            const list = (data3000.success && Array.isArray(data3000.data))
+              ? data3000.data
+              : (Array.isArray(data3000.data) ? data3000.data : (data3000.data?.rides || data3000.rides || (Array.isArray(data3000) ? data3000 : [])));
+            if (Array.isArray(list) && list.length > 0) {
+              combined.push(...list);
+            }
+          }
+        } catch (err) {}
+      }
+
+      // De-duplicate by requestId || id || _id
+      const idMap = new Map();
+      combined.forEach(r => {
+        if (!r) return;
+        const key = String(r.requestId || r.id || r._id || r.rideId);
+        if (!idMap.has(key)) {
+          idMap.set(key, r);
+        }
+      });
+
+      const uniqueRides = Array.from(idMap.values());
+      if (uniqueRides.length > 0) {
+        setRideRequests(uniqueRides);
       }
     } catch (err) {
       console.error('Fetch error:', err);

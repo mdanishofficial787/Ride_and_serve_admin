@@ -236,11 +236,7 @@ export const getAllRides = async (req, res, next) => {
       pendingCount,
       assignedCount,
       totalCount: rides.length,
-      data: {
-        rides,
-        pendingCount,
-        assignedCount
-      },
+      data: rides,
       rides
     });
   } catch (err) {
