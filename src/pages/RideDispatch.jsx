@@ -193,57 +193,52 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // 1. Data fetching from http://192.168.88.132:3000/api/rides and admin database backend
+  // 1. Ultra-resilient Parallel Data fetching from backend and mobile URL
   const loadRides = useCallback(async () => {
     try {
+      const ctrl = new AbortController();
+      const tid = setTimeout(() => ctrl.abort(), 800);
+
+      const endpoints = [
+        '/api/rides',
+        `${ADMIN_5000}/api/rides`,
+        'http://localhost:5000/api/rides',
+        'http://127.0.0.1:5000/api/rides',
+        'http://localhost:3000/api/rides'
+      ];
+
+      const fetchPromises = endpoints.map(url =>
+        fetch(url)
+          .then(async res => {
+            if (!res.ok) return null;
+            return await res.json();
+          })
+          .catch(() => null)
+      );
+
+      // Mobile IP attempt in parallel
+      fetchPromises.push(
+        fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal })
+          .then(async res => {
+            if (!res.ok) return null;
+            return await res.json();
+          })
+          .catch(() => null)
+      );
+
+      const results = await Promise.all(fetchPromises);
+      clearTimeout(tid);
+
       const combined = [];
-
-      // A) Primary: Try mobile host IP http://192.168.88.132:3000/api/rides (with 1.2s timeout)
-      try {
-        const ctrl = new AbortController();
-        const tid = setTimeout(() => ctrl.abort(), 1200);
-        const res = await fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal });
-        clearTimeout(tid);
-        if (res.ok) {
-          const data = await res.json();
-          const list = (data.success && Array.isArray(data.data))
-            ? data.data
-            : (Array.isArray(data.data) ? data.data : (data.data?.rides || data.rides || (Array.isArray(data) ? data : [])));
-          if (Array.isArray(list) && list.length > 0) {
-            combined.push(...list);
-          }
+      results.forEach(data => {
+        if (!data) return;
+        const list = (data.success && Array.isArray(data.data))
+          ? data.data
+          : (Array.isArray(data.data) ? data.data : (data.data?.rides || data.rides || (Array.isArray(data) ? data : [])));
+        if (Array.isArray(list) && list.length > 0) {
+          combined.push(...list);
         }
-      } catch (err) {}
-
-      // B) Admin Database Backend (port 5000 /api/rides - connects directly to MongoDB Atlas)
-      try {
-        const dbRes = await fetch(`${ADMIN_5000}/api/rides`);
-        if (dbRes.ok) {
-          const dbData = await dbRes.json();
-          const list = (dbData.success && Array.isArray(dbData.data))
-            ? dbData.data
-            : (Array.isArray(dbData.data) ? dbData.data : (dbData.data?.rides || dbData.rides || (Array.isArray(dbData) ? dbData : [])));
-          if (Array.isArray(list) && list.length > 0) {
-            combined.push(...list);
-          }
-        }
-      } catch (err) {}
-
-      // C) Port 3000 localhost fallback
-      if (combined.length === 0) {
-        try {
-          const res3000 = await fetch('http://localhost:3000/api/rides');
-          if (res3000.ok) {
-            const data3000 = await res3000.json();
-            const list = (data3000.success && Array.isArray(data3000.data))
-              ? data3000.data
-              : (Array.isArray(data3000.data) ? data3000.data : (data3000.data?.rides || data3000.rides || (Array.isArray(data3000) ? data3000 : [])));
-            if (Array.isArray(list) && list.length > 0) {
-              combined.push(...list);
-            }
-          }
-        } catch (err) {}
-      }
+      });
 
       // De-duplicate by requestId || id || _id
       const idMap = new Map();
