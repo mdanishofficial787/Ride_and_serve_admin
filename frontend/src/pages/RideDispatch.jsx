@@ -170,6 +170,26 @@ const normalizeRide = (r) => {
 
 const initialCustomerRides = [
   {
+    _id: '6aa1070ebe696f0cde1a41c9',
+    id: 'REQ-8013',
+    requestId: 'REQ-8013',
+    rideId: 'REQ-8013',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    passengerEmail: 'riazkhawar66@gmail.com',
+    pickupLocation: 'Habib Bank Ltd., F11 Markaz, Hilal Road, F-11 Markaz',
+    dropLocation: 'F7 Food Court, Bhitai Road, F-7/2, F-7',
+    dropoffLocation: 'F7 Food Court, Bhitai Road, F-7/2, F-7',
+    route: { summary: 'Habib Bank Ltd., F11 Markaz ➔ F7 Food Court, Bhitai Road' },
+    scheduledTime: '2026-09-09 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'AC',
+    fareFormatted: 'Rs. 9,500',
+    fare: 9500,
+    status: 'Pending Dispatch'
+  },
+  {
     _id: '6aa0ef08568b2e37a859c933',
     id: 'REQ-8012',
     requestId: 'REQ-8012',
@@ -460,18 +480,17 @@ const RideDispatch = () => {
     try {
       let list = [];
       const timestamp = Date.now();
+      const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
       const endpoints = [
         `/api/rides?_t=${timestamp}`,
+        `http://${currentHost}:5000/api/rides?_t=${timestamp}`,
         `http://localhost:5000/api/rides?_t=${timestamp}`,
         `${ADMIN_5000}/api/rides?_t=${timestamp}`
       ];
 
       for (const url of endpoints) {
         try {
-          const res = await fetch(url, {
-            cache: 'no-store',
-            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
-          });
+          const res = await fetch(url);
           if (res.ok) {
             const data = await res.json();
             const rawList = Array.isArray(data.data) 
@@ -493,9 +512,10 @@ const RideDispatch = () => {
         const idMap = new Map();
         list.forEach(r => {
           if (!r) return;
-          const key = String(r.requestId || r.id || r._id || r.rideId);
+          const normalized = normalizeRide(r) || r;
+          const key = String(normalized.requestId || normalized.id || normalized._id || normalized.rideId);
           if (!idMap.has(key)) {
-            idMap.set(key, r);
+            idMap.set(key, normalized);
           }
         });
 
@@ -578,11 +598,12 @@ const RideDispatch = () => {
 
     let socket = null;
     try {
-      const socketTarget = ADMIN_5000 || 'http://localhost:5000';
+      const currentHost = typeof window !== 'undefined' ? (window.location.hostname || 'localhost') : 'localhost';
+      const socketTarget = ADMIN_5000 || `http://${currentHost}:5000`;
       socket = io(socketTarget, {
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 10,
+        reconnectionAttempts: 20,
         reconnectionDelay: 1000
       });
 
@@ -590,8 +611,34 @@ const RideDispatch = () => {
         socket.emit('join-admin');
       });
 
-      socket.on('new-ride', () => loadRides());
-      socket.on('ride-created', () => loadRides());
+      socket.on('new-ride', (data) => {
+        if (data) {
+          const norm = normalizeRide(data);
+          if (norm) {
+            setRideRequests(prev => {
+              const key = String(norm.requestId || norm.id || norm._id);
+              if (prev.some(r => String(r.requestId || r.id || r._id) === key)) return prev;
+              return [norm, ...prev];
+            });
+          }
+        }
+        loadRides();
+      });
+
+      socket.on('ride-created', (data) => {
+        if (data) {
+          const norm = normalizeRide(data);
+          if (norm) {
+            setRideRequests(prev => {
+              const key = String(norm.requestId || norm.id || norm._id);
+              if (prev.some(r => String(r.requestId || r.id || r._id) === key)) return prev;
+              return [norm, ...prev];
+            });
+          }
+        }
+        loadRides();
+      });
+
       socket.on('ride-dispatched', () => loadRides());
       socket.on('ride-assigned', () => loadRides());
       socket.on('ride-update', () => loadRides());

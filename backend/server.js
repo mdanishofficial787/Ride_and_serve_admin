@@ -55,11 +55,10 @@ io.on('connection', (socket) => {
 // Make io accessible globally for controllers
 app.set('io', io);
 
-// CORS Middleware
+// CORS Middleware - Allow all origins and all headers
 app.use(cors({
   origin: '*',
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS']
 }));
 
 app.use(express.json({ limit: '10mb' }));
@@ -169,7 +168,7 @@ const startServer = async () => {
             }
           }
         } catch (e) {}
-      }, 2000);
+      }, 1000);
 
       httpServer.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
