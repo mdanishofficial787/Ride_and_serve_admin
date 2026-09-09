@@ -93,6 +93,55 @@ export const formatRideRecord = (r) => {
   };
 };
 
+function buildRideQuery(filter = {}) {
+  const reqId = filter.requestId || filter.rideId || filter.id;
+  const rawId = filter._id || filter.id || (typeof filter === 'string' ? filter : null);
+  
+  const conditions = [];
+
+  // Check ObjectId
+  if (rawId && typeof rawId === 'string' && /^[0-9a-fA-F]{24}$/.test(rawId)) {
+    try {
+      conditions.push({ _id: new mongoose.Types.ObjectId(rawId) });
+    } catch (e) {}
+  } else if (rawId && typeof rawId === 'object' && rawId instanceof mongoose.Types.ObjectId) {
+    conditions.push({ _id: rawId });
+  }
+
+  // Check string _id
+  if (rawId) {
+    conditions.push({ _id: String(rawId) });
+  }
+
+  // Check requestId
+  if (reqId) {
+    const sReqId = String(reqId).trim();
+    conditions.push({ requestId: reqId });
+    conditions.push({ requestId: sReqId });
+    
+    const num = Number(sReqId);
+    if (!isNaN(num)) {
+      conditions.push({ requestId: num });
+    }
+
+    if (sReqId.toUpperCase().startsWith('REQ-')) {
+      const stripped = sReqId.replace(/^REQ-/i, '').trim();
+      conditions.push({ requestId: stripped });
+      const strippedNum = Number(stripped);
+      if (!isNaN(strippedNum)) {
+        conditions.push({ requestId: strippedNum });
+      }
+    } else {
+      conditions.push({ requestId: `REQ-${sReqId}` });
+    }
+  }
+
+  if (conditions.length === 0) {
+    return filter;
+  }
+  return { $or: conditions };
+}
+
 // ==========================================
 // RIDE ADAPTER (Customer App rides collection)
 // ==========================================
@@ -115,7 +164,11 @@ export const RideDB = {
       try {
         const client = mongoose.connection?.client;
         if (client) {
-          const appReqs = await client.db('ride_and_serve').collection('riderequests').find({}).sort({ createdAt: -1 }).limit(limit).toArray();
+          let mongoFilter = {};
+          if (query && Object.keys(query).length > 0) {
+            mongoFilter = query;
+          }
+          const appReqs = await client.db('ride_and_serve').collection('riderequests').find(mongoFilter).sort({ createdAt: -1 }).limit(limit).toArray();
           return appReqs.map(r => ({
             _id: r._id,
             id: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
@@ -164,8 +217,7 @@ export const RideDB = {
       try {
         const client = mongoose.connection?.client;
         if (client) {
-          const reqId = filter.requestId || filter.rideId || filter.id;
-          const query = reqId ? { requestId: reqId } : (filter._id ? { _id: filter._id } : filter);
+          const query = buildRideQuery(filter);
           const r = await client.db('ride_and_serve').collection('riderequests').findOne(query);
           if (r) {
             return {
@@ -192,7 +244,9 @@ export const RideDB = {
             };
           }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('RideDB findOne error:', e);
+      }
       return await RideModel.findOne(filter).populate('customer').populate('driver');
     }
     return null;
@@ -207,11 +261,33 @@ export const RideDB = {
       try {
         const client = mongoose.connection?.client;
         if (client) {
-          const reqId = filter.requestId || filter.rideId || filter.id;
-          const query = reqId ? { requestId: reqId } : (filter._id ? { _id: filter._id } : filter);
-          await client.db('ride_and_serve').collection('riderequests').updateOne(query, { $set: updateData });
+          const query = buildRideQuery(filter);
+          const updateDoc = {};
+          const setFields = {};
+
+          for (const [key, val] of Object.entries(updateData)) {
+            if (key.startsWith('$')) {
+              updateDoc[key] = val;
+            } else {
+              setFields[key] = val;
+            }
+          }
+
+          if (Object.keys(setFields).length > 0) {
+            updateDoc.$set = { ...(updateDoc.$set || {}), ...setFields };
+          }
+          if (!updateDoc.$set) updateDoc.$set = {};
+          updateDoc.$set.updatedAt = new Date();
+
+          await client.db('ride_and_serve').collection('riderequests').updateOne(query, updateDoc);
+          const updated = await client.db('ride_and_serve').collection('riderequests').findOne(query);
+          if (updated) {
+            return formatRideRecord(updated);
+          }
         }
-      } catch (e) {}
+      } catch (e) {
+        console.error('RideDB update error:', e);
+      }
       return await RideModel.findOneAndUpdate(filter, updateData, { new: true });
     }
     return null;

@@ -178,49 +178,32 @@ export const RideAPI = {
     return request('/requests');
   },
 
-  // PATCH /api/rides/:id/dispatch - Dispatch Driver to Ride (e.g. { driverName: "Ali Khan" })
+  // PATCH /api/rides/:id/dispatch - Fast Dispatch Driver to Ride
   dispatch: async (rideId, driverName, driverId = null) => {
     const payload = { driverName, driverId };
 
-    // 1. Try mobile URL http://192.168.88.132:3000
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 1000);
-      const resMob = await fetch(`http://192.168.88.132:3000/api/rides/${rideId}/dispatch`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: ctrl.signal
-      });
-      clearTimeout(tid);
-      if (resMob.ok) return await resMob.json();
-    } catch (e) {}
-
-    // 2. Try port 3000
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 1000);
-      const res3000 = await fetch(`http://localhost:3000/api/rides/${rideId}/dispatch`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: ctrl.signal
-      });
-      clearTimeout(tid);
-      if (res3000.ok) return await res3000.json();
-    } catch (e) {}
-
-    // 3. Try main backend PATCH /api/rides/:id/dispatch
+    // 1. Direct call to main backend (Port 5000) - Instant (<20ms)
     try {
       const patchRes = await fetch(`${BACKEND_URL}/api/rides/${rideId}/dispatch`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (patchRes.ok) return await patchRes.json();
-    } catch (e) {}
+      if (patchRes.ok) {
+        const data = await patchRes.json();
+        // Fire-and-forget background ping to mobile app endpoints
+        fetch(`http://192.168.88.132:3000/api/rides/${rideId}/dispatch`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+        return data;
+      }
+    } catch (e) {
+      console.warn('[Dispatch] Direct backend dispatch failed, attempting fallback:', e.message);
+    }
 
-    // 4. Fallback to POST /api/ride/assign
+    // 2. Fallback to POST /api/ride/assign
     return request('/ride/assign', {
       method: 'POST',
       body: JSON.stringify({ rideId, driverId, remarks: `Dispatched to ${driverName}` })
@@ -237,45 +220,28 @@ export const RideAPI = {
   assign: async (rideId, driverId, extraData = {}) => {
     const payload = { rideId, driverId, ...extraData };
 
-    // 1. Try mobile URL http://192.168.88.132:3000
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 1000);
-      const resMob = await fetch('http://192.168.88.132:3000/api/ride/assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: ctrl.signal
-      });
-      clearTimeout(tid);
-      if (resMob.ok) return await resMob.json();
-    } catch (e) {}
-
-    // 2. Try port 3000
-    try {
-      const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 1000);
-      const res3000 = await fetch('http://localhost:3000/api/ride/assign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-        signal: ctrl.signal
-      });
-      clearTimeout(tid);
-      if (res3000.ok) return await res3000.json();
-    } catch (e) {}
-
-    // 3. Try main backend POST /api/ride/assign
+    // 1. Direct call to main backend (Port 5000) - Instant (<20ms)
     try {
       const res = await fetch(`${BACKEND_URL}/api/ride/assign`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       });
-      if (res.ok) return await res.json();
-    } catch (e) {}
+      if (res.ok) {
+        const data = await res.json();
+        // Fire-and-forget background ping to mobile app endpoints
+        fetch('http://192.168.88.132:3000/api/ride/assign', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload)
+        }).catch(() => {});
+        return data;
+      }
+    } catch (e) {
+      console.warn('[Assign] Direct backend assign failed, attempting fallback:', e.message);
+    }
 
-    // 4. Fallback to POST /api/assignments
+    // 2. Fallback to POST /api/assignments
     return request('/assignments', {
       method: 'POST',
       body: JSON.stringify({ requestId: rideId, driverId, ...extraData })

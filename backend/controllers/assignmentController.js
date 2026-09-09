@@ -36,6 +36,9 @@ export const createAssignment = async (req, res, next) => {
         status: 'ASSIGNED',
         driver: driver._id,
         driverId: driver._id,
+        assignedDriver: assignedDriverName,
+        assignedDriverPhone: assignedPhone,
+        assignedDriverCode: assignedDriverCode,
         assignedDriverDetails: {
           driverCode: assignedDriverCode,
           name: assignedDriverName,
@@ -63,9 +66,30 @@ export const createAssignment = async (req, res, next) => {
       // Update Driver Availability
       await DriverDB.update(drvFilter, { availability: 'On Trip' });
 
+      // Socket.IO real-time notification to driver mobile app
+      const io = req.app.get('io');
+      const formattedRide = formatRideRecord(updatedRide || ride);
+      if (io) {
+        const payload = {
+          rideId: ride._id,
+          requestId: ride.requestId || ride.rideId || targetRideId,
+          driverId: driver._id,
+          driverCode: assignedDriverCode,
+          driverName: assignedDriverName,
+          driverPhone: assignedPhone,
+          status: 'ASSIGNED',
+          ride: formattedRide
+        };
+        io.emit('ride-assigned', payload);
+        io.emit('ride-dispatched', payload);
+        io.to(`driver-${driver._id}`).emit('new-assignment', payload);
+        if (driver.driverId) io.to(`driver-${driver.driverId}`).emit('new-assignment', payload);
+        if (assignedDriverCode) io.to(`driver-${assignedDriverCode}`).emit('new-assignment', payload);
+      }
+
       return sendSuccess(res, {
         ...newAssignment,
-        ride: formatRideRecord(updatedRide || ride),
+        ride: formattedRide,
         driver
       }, `Ride ${ride.rideId || targetRideId} successfully assigned to ${assignedDriverName}`, 201);
     }
@@ -89,6 +113,9 @@ export const createAssignment = async (req, res, next) => {
     await RequestDB.update(reqFilter, {
       status: 'ASSIGNED',
       driverId: driver._id,
+      assignedDriver: assignedDriverName,
+      assignedDriverPhone: assignedPhone,
+      assignedDriverCode: assignedDriverCode,
       assignedDriverDetails: {
         driverCode: assignedDriverCode,
         name: assignedDriverName,
@@ -110,9 +137,29 @@ export const createAssignment = async (req, res, next) => {
       availability: 'On Trip'
     });
 
+    const formattedReq = formatRideRecord(request);
+    const ioFallback = req.app.get('io');
+    if (ioFallback) {
+      const payload = {
+        rideId: request._id,
+        requestId: request.requestId,
+        driverId: driver._id,
+        driverCode: assignedDriverCode,
+        driverName: assignedDriverName,
+        driverPhone: assignedPhone,
+        status: 'ASSIGNED',
+        ride: formattedReq
+      };
+      ioFallback.emit('ride-assigned', payload);
+      ioFallback.emit('ride-dispatched', payload);
+      ioFallback.to(`driver-${driver._id}`).emit('new-assignment', payload);
+      if (driver.driverId) ioFallback.to(`driver-${driver.driverId}`).emit('new-assignment', payload);
+      if (assignedDriverCode) ioFallback.to(`driver-${assignedDriverCode}`).emit('new-assignment', payload);
+    }
+
     return sendSuccess(res, {
       ...newAssignment,
-      request: formatRideRecord(request),
+      request: formattedReq,
       driver
     }, `Ride ${request.requestId} successfully assigned to ${assignedDriverName}`, 201);
   } catch (err) {
@@ -192,16 +239,31 @@ export const getDriverAssignedRides = async (req, res, next) => {
 
     const formattedRides = [...rawCustomerRides, ...rawRequests].map(formatRideRecord);
 
+    let finalRides = formattedRides;
+    if (targetDriverId) {
+      const tid = String(targetDriverId).toLowerCase().trim();
+      finalRides = formattedRides.filter(r => {
+        const dId = String(r.driverId || r.driver || '').toLowerCase();
+        const dCode = String(r.assignedDriverDetails?.driverCode || '').toLowerCase();
+        const dName = String(r.assignedDriverDetails?.name || '').toLowerCase();
+        return dId === tid || dCode === tid || (driverObj && (
+          dId === String(driverObj._id).toLowerCase() || 
+          dCode === String(driverObj.driverId || driverObj.driverReferenceId || '').toLowerCase() || 
+          dName === String(driverObj.Name || driverObj.name || '').toLowerCase()
+        ));
+      });
+    }
+
     return sendSuccess(res, {
-      rides: formattedRides,
-      total: formattedRides.length
+      rides: finalRides,
+      data: finalRides,
+      total: finalRides.length
     }, 'Driver assigned rides retrieved successfully');
   } catch (err) {
     next(err);
   }
 };
 
-// @desc    Get all rides with mapped structure & pending/assigned counts
 // @desc    Get all rides with mapped structure & pending/assigned counts
 // @route   GET /api/rides
 export const getAllRides = async (req, res, next) => {
@@ -289,12 +351,13 @@ export const dispatchDriverToRide = async (req, res, next) => {
         remarks: remarks || `Dispatched to ${assignedDriverName}`
       });
 
-      await RideDB.update(rideFilter, {
+      const updatedRide = await RideDB.update(rideFilter, {
         status: 'ASSIGNED',
         driver: driver?._id || driverId || null,
         driverId: driver?._id || driverId || null,
         assignedDriver: assignedDriverName,
         assignedDriverPhone: assignedPhone,
+        assignedDriverCode: assignedDriverCode,
         assignedDriverDetails: {
           driverCode: assignedDriverCode,
           name: assignedDriverName,
@@ -308,12 +371,33 @@ export const dispatchDriverToRide = async (req, res, next) => {
         await DriverDB.update({ _id: driver._id }, { availability: 'On Trip' });
       }
 
+      const formatted = formatRideRecord(updatedRide || ride);
+      const io = req.app.get('io');
+      if (io) {
+        const payload = {
+          rideId: ride._id,
+          requestId: ride.requestId || ride.id || id,
+          driverId: driver?._id || driverId,
+          driverCode: assignedDriverCode,
+          driverName: assignedDriverName,
+          driverPhone: assignedPhone,
+          status: 'ASSIGNED',
+          ride: formatted
+        };
+        io.emit('ride-assigned', payload);
+        io.emit('ride-dispatched', payload);
+        if (driver?._id) io.to(`driver-${driver._id}`).emit('new-assignment', payload);
+        if (driverId) io.to(`driver-${driverId}`).emit('new-assignment', payload);
+        if (assignedDriverCode) io.to(`driver-${assignedDriverCode}`).emit('new-assignment', payload);
+      }
+
       return sendSuccess(res, {
         rideId: ride._id,
         requestId: ride.requestId || ride.id || ride._id,
         status: 'ASSIGNED',
         driverName: assignedDriverName,
-        driverCode: assignedDriverCode
+        driverCode: assignedDriverCode,
+        ride: formatted
       }, `Driver ${assignedDriverName} successfully dispatched to ride`);
     }
 
@@ -337,6 +421,9 @@ export const dispatchDriverToRide = async (req, res, next) => {
     await RequestDB.update(reqFilter, {
       status: 'ASSIGNED',
       driverId: driver?._id || driverId || null,
+      assignedDriver: assignedDriverName,
+      assignedDriverPhone: assignedPhone,
+      assignedDriverCode: assignedDriverCode,
       assignedDriverDetails: {
         driverCode: assignedDriverCode,
         name: assignedDriverName,
@@ -357,12 +444,33 @@ export const dispatchDriverToRide = async (req, res, next) => {
       await DriverDB.update({ _id: driver._id }, { availability: 'On Trip' });
     }
 
+    const formattedReq = formatRideRecord(request);
+    const ioReq = req.app.get('io');
+    if (ioReq) {
+      const payload = {
+        rideId: request._id,
+        requestId: request.requestId || id,
+        driverId: driver?._id || driverId,
+        driverCode: assignedDriverCode,
+        driverName: assignedDriverName,
+        driverPhone: assignedPhone,
+        status: 'ASSIGNED',
+        ride: formattedReq
+      };
+      ioReq.emit('ride-assigned', payload);
+      ioReq.emit('ride-dispatched', payload);
+      if (driver?._id) ioReq.to(`driver-${driver._id}`).emit('new-assignment', payload);
+      if (driverId) ioReq.to(`driver-${driverId}`).emit('new-assignment', payload);
+      if (assignedDriverCode) ioReq.to(`driver-${assignedDriverCode}`).emit('new-assignment', payload);
+    }
+
     return sendSuccess(res, {
       rideId: request._id,
       requestId: request.requestId,
       status: 'ASSIGNED',
       driverName: assignedDriverName,
-      driverCode: assignedDriverCode
+      driverCode: assignedDriverCode,
+      ride: formattedReq
     }, `Driver ${assignedDriverName} successfully dispatched to ride ${request.requestId || id}`);
   } catch (err) {
     next(err);

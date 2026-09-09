@@ -586,25 +586,19 @@ const RideDispatch = () => {
   // Handle Dispatch via POST /api/ride/assign (and PATCH /api/rides/:id/dispatch)
   const handleDispatch = async (driver) => {
     if (!selectedRide) return;
-    const rideId = selectedRide._id || selectedRide.requestId || selectedRide.id;
+    const currentSelected = selectedRide;
+    const rideId = currentSelected._id || currentSelected.requestId || currentSelected.id;
     const driverId = driver._id || driver.id;
     const driverName = driver.personalInfo?.name || driver.name || driver.Name || 'Ali Khan';
     const driverPhone = driver.personalInfo?.phone || driver.phone || driver.PhoneNumber || '+92 300 1234567';
     const driverVehicle = `${driver.vehicleInfo?.make || driver.vehicleDetails?.make || ''} ${driver.vehicleInfo?.model || driver.vehicleDetails?.model || ''}`.trim() || 'Toyota Corolla';
     const driverCode = driver.id || driver.driverReferenceId || driver.driverId || 'DRV-1001';
 
-    try {
-      await RideAPI.dispatch(rideId, driverName, driverId);
-      await RideAPI.assign(rideId, driverId, { driverName });
-    } catch (err) {
-      console.error('Dispatch API error:', err);
-    }
-
-    // Immediately update reactive local state with no page refresh
+    // 1. Instant Optimistic UI Update (0ms delay)
     setRideRequests(prev => prev.map(r => {
-      const match = (r._id && selectedRide._id && String(r._id) === String(selectedRide._id)) ||
-                    (r.requestId && selectedRide.requestId && String(r.requestId) === String(selectedRide.requestId)) ||
-                    (r.id && selectedRide.id && String(r.id) === String(selectedRide.id));
+      const match = (r._id && currentSelected._id && String(r._id) === String(currentSelected._id)) ||
+                    (r.requestId && currentSelected.requestId && String(r.requestId) === String(currentSelected.requestId)) ||
+                    (r.id && currentSelected.id && String(r.id) === String(currentSelected.id));
       if (match) {
         return {
           ...r,
@@ -622,15 +616,27 @@ const RideDispatch = () => {
       return r;
     }));
 
-    setToastMessage(`✓ Ride ${selectedRide.requestId || selectedRide.id || 'REQ'} successfully dispatched to ${driverName}!`);
+    setToastMessage(`✓ Ride ${currentSelected.requestId || currentSelected.id || 'REQ'} successfully dispatched to ${driverName}!`);
     setToastActionDriver(driver);
+    setSelectedRide(null);
+
     setTimeout(() => {
       setToastMessage('');
       setToastActionDriver(null);
     }, 6000);
 
-    setSelectedRide(null);
-    await loadRides();
+    // 2. Parallel Fast API Calls (Port 5000)
+    try {
+      await Promise.allSettled([
+        RideAPI.dispatch(rideId, driverName, driverId),
+        RideAPI.assign(rideId, driverId, { driverName })
+      ]);
+    } catch (err) {
+      console.error('Dispatch API error:', err);
+    }
+
+    // 3. Silent sync
+    loadRides();
   };
 
   // Smart Recommendation Scoring Algorithm

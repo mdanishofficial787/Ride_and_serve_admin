@@ -42,6 +42,14 @@ io.on('connection', (socket) => {
     socket.join('admin-room');
     console.log(`[Socket.IO] Admin joined room: ${socket.id}`);
   });
+
+  // Driver joins room to receive dispatched rides in real-time
+  socket.on('join-driver', (driverId) => {
+    if (driverId) {
+      socket.join(`driver-${driverId}`);
+      console.log(`[Socket.IO] Driver ${driverId} joined room: driver-${driverId}`);
+    }
+  });
 });
 
 // Make io accessible globally for controllers
