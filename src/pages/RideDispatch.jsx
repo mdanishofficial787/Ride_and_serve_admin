@@ -377,6 +377,59 @@ const initialCustomerRides = [
   }
 ];
 
+const LOCAL_STORAGE_ASSIGNMENTS_KEY = 'rr_persistent_assigned_rides';
+
+const getStoredAssignments = () => {
+  try {
+    const raw = localStorage.getItem(LOCAL_STORAGE_ASSIGNMENTS_KEY);
+    return raw ? JSON.parse(raw) : {};
+  } catch (e) {
+    return {};
+  }
+};
+
+const saveStoredAssignment = (rideId, assignmentData) => {
+  try {
+    const stored = getStoredAssignments();
+    stored[String(rideId)] = { ...assignmentData, timestamp: Date.now() };
+    localStorage.setItem(LOCAL_STORAGE_ASSIGNMENTS_KEY, JSON.stringify(stored));
+  } catch (e) {}
+};
+
+const isRideAssigned = (r) => {
+  if (!r) return false;
+  
+  // 1. Check local storage persistent assignments map
+  const stored = getStoredAssignments();
+  const rKey1 = r._id ? String(r._id) : null;
+  const rKey2 = r.requestId ? String(r.requestId) : null;
+  const rKey3 = r.id ? String(r.id) : null;
+  const rKey4 = r.rideId ? String(r.rideId) : null;
+
+  if ((rKey1 && stored[rKey1]) || (rKey2 && stored[rKey2]) || (rKey3 && stored[rKey3]) || (rKey4 && stored[rKey4])) {
+    return true;
+  }
+
+  // 2. Check status flags
+  const s = String(r.status || '').trim().toUpperCase();
+  if (s === 'ASSIGNED' || s.startsWith('DISPATCH') || s === 'COMPLETED' || s === 'ON TRIP' || s === 'IN PROGRESS') {
+    return true;
+  }
+
+  // 3. Check driver assigned attributes
+  if (r.driverId && String(r.driverId).trim() !== '' && String(r.driverId) !== 'null') {
+    return true;
+  }
+  if (r.driver && String(r.driver).trim() !== '' && String(r.driver) !== 'null') {
+    return true;
+  }
+  if (r.assignedDriverDetails?.driverCode || r.assignedDriverDetails?.name || r.assignedDriver) {
+    return true;
+  }
+
+  return false;
+};
+
 const RideDispatch = () => {
   const [activeMainTab, setActiveMainTab] = useState('requests'); // 'requests' | 'driver-panel'
   const [rideRequests, setRideRequests] = useState(initialCustomerRides);
@@ -556,13 +609,9 @@ const RideDispatch = () => {
   }, [loadRides, fetchDrivers]);
 
   // Split pending vs assigned rides
-  // Sorted newest first so newly submitted customer rides are always at the top!
+  // STRICT RULE: Once assigned, a ride MUST NEVER appear in pending requests queue!
   const pendingRides = useMemo(() => {
-    const list = rides.filter(r => {
-      const s = String(r.status || '').trim();
-      if (s === 'Pending Dispatch' || s.toLowerCase().includes('pending') || s === 'Visible' || s === '') return true;
-      return s.toUpperCase() !== 'ASSIGNED' && !s.toUpperCase().startsWith('DISPATCHED');
-    });
+    const list = rides.filter(r => !isRideAssigned(r));
 
     return list.sort((a, b) => {
       const numA = parseInt(String(a.requestId || a.id || '').replace(/\D/g, ''), 10);
@@ -576,11 +625,9 @@ const RideDispatch = () => {
     });
   }, [rides]);
 
+  // Assigned rides ALWAYS and PERMANENTLY appear in Driver Panel & Live Assigned Rides
   const assignedRides = useMemo(() => {
-    return rides.filter(r => {
-      const s = String(r.status || '').trim().toUpperCase();
-      return s === 'ASSIGNED' || s.startsWith('DISPATCHED');
-    });
+    return rides.filter(r => isRideAssigned(r));
   }, [rides]);
 
   const pendingCount = pendingRides.length;
@@ -627,7 +674,7 @@ const RideDispatch = () => {
 
   const fetchRides = loadRides;
 
-  // Handle Dispatch: assign driver, optimistically update, and switch to Driver Panel Tab
+  // Handle Dispatch: assign driver, save to permanent storage, update UI, and switch to Driver Panel
   const handleDispatch = async (driver) => {
     if (!selectedRide) return;
     const currentSelected = selectedRide;
@@ -638,7 +685,28 @@ const RideDispatch = () => {
     const driverVehicle = `${driver.vehicleInfo?.make || driver.vehicleDetails?.make || ''} ${driver.vehicleInfo?.model || driver.vehicleDetails?.model || ''}`.trim() || 'Toyota Corolla';
     const driverCode = driver.id || driver.driverReferenceId || driver.driverId || 'DRV-1001';
 
-    // 1. Instant Optimistic UI Update (0ms delay)
+    // Persist to permanent localStorage assignment cache immediately!
+    const assignData = {
+      status: 'ASSIGNED',
+      driverId: String(driverId),
+      driverName,
+      driverCode,
+      driverPhone,
+      driverVehicle,
+      assignedDriver: driverName,
+      assignedDriverDetails: {
+        driverCode,
+        name: driverName,
+        phone: driverPhone,
+        vehicle: driverVehicle,
+        rating: driver.performance?.rating || driver.rating || 4.9
+      }
+    };
+    if (currentSelected._id) saveStoredAssignment(currentSelected._id, assignData);
+    if (currentSelected.requestId) saveStoredAssignment(currentSelected.requestId, assignData);
+    if (currentSelected.id) saveStoredAssignment(currentSelected.id, assignData);
+
+    // 1. Instant Optimistic UI Update (0ms delay) - moves immediately from pending to assigned!
     setRideRequests(prev => prev.map(r => {
       const match = (r._id && currentSelected._id && String(r._id) === String(currentSelected._id)) ||
                     (r.requestId && currentSelected.requestId && String(r.requestId) === String(currentSelected.requestId)) ||
@@ -648,13 +716,8 @@ const RideDispatch = () => {
           ...r,
           status: 'ASSIGNED',
           driverId: driverId,
-          assignedDriverDetails: {
-            driverCode: driverCode,
-            name: driverName,
-            phone: driverPhone,
-            vehicle: driverVehicle,
-            rating: driver.performance?.rating || driver.rating || 4.9
-          }
+          assignedDriver: driverName,
+          assignedDriverDetails: assignData.assignedDriverDetails
         };
       }
       return r;
@@ -668,7 +731,7 @@ const RideDispatch = () => {
       return d;
     }));
 
-    setToastMessage(`✓ Ride ${currentSelected.requestId || currentSelected.id || 'REQ'} successfully assigned to ${driverName}! Showing in Driver Panel.`);
+    setToastMessage(`✓ Ride ${currentSelected.requestId || currentSelected.id || 'REQ'} assigned to ${driverName}! Showing in Driver Panel.`);
     setToastActionDriver(driver);
     setSelectedRide(null);
 

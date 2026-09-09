@@ -37,7 +37,14 @@ export const formatRideRecord = (r) => {
     ? (typeof isPlain.fare === 'number' ? `AED ${isPlain.fare}` : String(isPlain.fare).startsWith('AED') || String(isPlain.fare).startsWith('Rs') ? String(isPlain.fare) : `Rs. ${isPlain.fare}`)
     : 'AED 45';
 
-  const isAssigned = isPlain.status === 'ASSIGNED' || isPlain.status === 'assigned' || (isPlain.status && String(isPlain.status).startsWith('Dispatched'));
+  const isAssigned = isPlain.status === 'ASSIGNED' || 
+                     isPlain.status === 'assigned' || 
+                     (isPlain.status && String(isPlain.status).toUpperCase().startsWith('DISPATCH')) ||
+                     (Boolean(isPlain.driverId) && String(isPlain.driverId) !== 'null' && String(isPlain.driverId).trim() !== '') ||
+                     (Boolean(isPlain.driver) && String(isPlain.driver) !== 'null' && String(isPlain.driver).trim() !== '') ||
+                     (Boolean(isPlain.assignedDriverId) && String(isPlain.assignedDriverId) !== 'null') ||
+                     Boolean(isPlain.assignedDriver) ||
+                     Boolean(isPlain.assignedDriverDetails?.name);
 
   const dateStr = isPlain.date || (isPlain.createdAt ? new Date(isPlain.createdAt).toLocaleDateString() : 'Today');
   const timeStr = isPlain.timeToLeave || (isPlain.createdAt ? new Date(isPlain.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '08:00 AM');
