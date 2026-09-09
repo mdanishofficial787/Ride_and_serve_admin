@@ -170,6 +170,25 @@ const normalizeRide = (r) => {
 
 const initialCustomerRides = [
   {
+    _id: '6aa0ef08568b2e37a859c933',
+    id: 'REQ-8012',
+    requestId: 'REQ-8012',
+    customerName: 'khawar',
+    passengerName: 'khawar',
+    passengerPhone: '3165572409',
+    passengerEmail: 'riazkhawar66@gmail.com',
+    pickupLocation: 'peshawar',
+    dropLocation: 'sindh',
+    dropoffLocation: 'sindh',
+    route: { summary: 'peshawar ➔ sindh' },
+    scheduledTime: '2026-09-09 08:30 AM',
+    vehicleType: 'Sedan',
+    acPreference: 'Non AC',
+    fareFormatted: 'Rs. 9,500',
+    fare: 9500,
+    status: 'Pending Dispatch'
+  },
+  {
     _id: '6a9feb1a1e69d035472211f7',
     id: 'REQ-8011',
     requestId: 'REQ-8011',
