@@ -149,6 +149,28 @@ const startServer = async () => {
         console.log('====================================================');
       });
 
+      // Background Real-Time Watcher for Incoming Customer Rides
+      let lastKnownLatestId = null;
+      setInterval(async () => {
+        try {
+          const mongoose = (await import('mongoose')).default;
+          const client = mongoose.connection?.client;
+          if (client && mongoose.connection.readyState === 1) {
+            const latest = await client.db('ride_and_serve').collection('riderequests').find({}).sort({ _id: -1 }).limit(1).toArray();
+            if (latest && latest.length > 0) {
+              const latestIdStr = String(latest[0]._id);
+              if (lastKnownLatestId && lastKnownLatestId !== latestIdStr) {
+                console.log(`[Realtime Watcher] New Customer Ride Detected: ${latest[0].requestId || latestIdStr}`);
+                io.emit('new-ride', latest[0]);
+                io.emit('ride-created', latest[0]);
+                io.to('admin-room').emit('new-ride', latest[0]);
+              }
+              lastKnownLatestId = latestIdStr;
+            }
+          }
+        } catch (e) {}
+      }, 2000);
+
       httpServer.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {
           console.error(`⚠️ [Server] Port ${PORT} is already in use by a background process. Please terminate old process or retry.`);

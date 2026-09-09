@@ -159,7 +159,7 @@ export const RideDB = {
     return memoryStore.requests.filter(r => matchQuery(r, query)).length;
   },
 
-  async find(query = {}, sort = '-createdAt', skip = 0, limit = 50) {
+  async find(query = {}, sort = '-createdAt', skip = 0, limit = 200) {
     if (!isMemoryMode) {
       try {
         const client = mongoose.connection?.client;
@@ -168,7 +168,7 @@ export const RideDB = {
           if (query && Object.keys(query).length > 0) {
             mongoFilter = query;
           }
-          const appReqs = await client.db('ride_and_serve').collection('riderequests').find(mongoFilter).sort({ createdAt: -1 }).limit(limit).toArray();
+          const appReqs = await client.db('ride_and_serve').collection('riderequests').find(mongoFilter).sort({ _id: -1 }).limit(limit).toArray();
           return appReqs.map(r => ({
             _id: r._id,
             id: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,

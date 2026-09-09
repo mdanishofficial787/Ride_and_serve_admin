@@ -383,20 +383,23 @@ const RideDispatch = () => {
   const [toastMessage, setToastMessage] = useState('');
   const [toastActionDriver, setToastActionDriver] = useState(null);
 
-  // 1. Robust data fetching from backend /api/rides
+  // 1. Robust data fetching from backend /api/rides with timestamp cache buster
   const loadRides = useCallback(async () => {
     try {
       let list = [];
+      const timestamp = Date.now();
       const endpoints = [
-        '/api/rides',
-        'http://localhost:5000/api/rides',
-        `${ADMIN_5000}/api/rides`,
-        'http://127.0.0.1:5000/api/rides'
+        `/api/rides?_t=${timestamp}`,
+        `http://localhost:5000/api/rides?_t=${timestamp}`,
+        `${ADMIN_5000}/api/rides?_t=${timestamp}`
       ];
 
       for (const url of endpoints) {
         try {
-          const res = await fetch(url);
+          const res = await fetch(url, {
+            cache: 'no-store',
+            headers: { 'Cache-Control': 'no-cache', 'Pragma': 'no-cache' }
+          });
           if (res.ok) {
             const data = await res.json();
             const rawList = Array.isArray(data.data) 
@@ -496,18 +499,19 @@ const RideDispatch = () => {
     }
   }, []);
 
-  // 3. Permanent Live Fetch & Polling (Every 3 seconds)
+  // 3. Permanent Live Fetch, Real-time Socket & Fast 2s Polling
   useEffect(() => {
     loadRides();
     fetchDrivers();
 
     let socket = null;
     try {
-      socket = io(MOBILE_URL, {
+      const socketTarget = ADMIN_5000 || 'http://localhost:5000';
+      socket = io(socketTarget, {
         transports: ['websocket', 'polling'],
         reconnection: true,
-        reconnectionAttempts: 3,
-        reconnectionDelay: 2000
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000
       });
 
       socket.on('connect', () => {
@@ -515,25 +519,41 @@ const RideDispatch = () => {
       });
 
       socket.on('new-ride', () => loadRides());
+      socket.on('ride-created', () => loadRides());
       socket.on('ride-dispatched', () => loadRides());
+      socket.on('ride-assigned', () => loadRides());
       socket.on('ride-update', () => loadRides());
     } catch (e) {}
 
-    const timer = setInterval(loadRides, 3000);
+    // Polling every 2 seconds ensures incoming customer requests appear automatically
+    const timer = setInterval(loadRides, 2000);
+    const drvTimer = setInterval(fetchDrivers, 5000);
+
     return () => {
       if (socket) socket.disconnect();
       clearInterval(timer);
+      clearInterval(drvTimer);
     };
   }, [loadRides, fetchDrivers]);
 
   // Split pending vs assigned rides
-  // In Ride Dispatch (/driver-selection), do NOT filter out rides with status "Pending Dispatch"
-  // Include all rides where status is "Pending Dispatch" or status is not ASSIGNED
+  // Sorted newest first so newly submitted customer rides are always at the top!
   const pendingRides = useMemo(() => {
-    return rides.filter(r => {
+    const list = rides.filter(r => {
       const s = String(r.status || '').trim();
       if (s === 'Pending Dispatch' || s.toLowerCase().includes('pending') || s === 'Visible' || s === '') return true;
       return s.toUpperCase() !== 'ASSIGNED' && !s.toUpperCase().startsWith('DISPATCHED');
+    });
+
+    return list.sort((a, b) => {
+      const numA = parseInt(String(a.requestId || a.id || '').replace(/\D/g, ''), 10);
+      const numB = parseInt(String(b.requestId || b.id || '').replace(/\D/g, ''), 10);
+      if (!isNaN(numA) && !isNaN(numB) && numA !== numB) {
+        return numB - numA;
+      }
+      const dateA = new Date(a.createdAt || a.date || 0).getTime();
+      const dateB = new Date(b.createdAt || b.date || 0).getTime();
+      return dateB - dateA;
     });
   }, [rides]);
 
@@ -548,19 +568,24 @@ const RideDispatch = () => {
   const assignedCount = assignedRides.length;
 
   // Helper to find assigned rides for a specific driver
-  const getDriverAssignedTrips = (driver) => {
+  const getDriverAssignedTrips = useCallback((driver) => {
     if (!driver) return [];
-    const drvId = driver._id;
-    const drvCode = driver.id;
-    const drvName = (driver.personalInfo?.name || '').toLowerCase();
+    const drvId = String(driver._id || '').toLowerCase();
+    const drvCode = String(driver.id || driver.driverReferenceId || driver.driverId || '').toLowerCase();
+    const drvName = String(driver.personalInfo?.name || driver.name || driver.Name || '').toLowerCase().trim();
 
     return assignedRides.filter(r => {
-      const matchId = r.driverId === drvId || r.driverId === drvCode || r.driver === drvId;
-      const matchCode = r.assignedDriverDetails?.driverCode === drvCode;
-      const matchName = drvName && (r.assignedDriverDetails?.name || '').toLowerCase() === drvName;
+      const rDrvId = String(r.driverId || r.driver || '').toLowerCase();
+      const rDrvCode = String(r.assignedDriverDetails?.driverCode || '').toLowerCase();
+      const rDrvName = String(r.assignedDriverDetails?.name || r.assignedDriver || '').toLowerCase().trim();
+
+      const matchId = drvId && rDrvId && (rDrvId === drvId || drvId.endsWith(rDrvId) || rDrvId.endsWith(drvId));
+      const matchCode = drvCode && (rDrvCode === drvCode || rDrvId === drvCode);
+      const matchName = drvName && rDrvName && (rDrvName === drvName || rDrvName.includes(drvName) || drvName.includes(rDrvName));
+
       return matchId || matchCode || matchName;
     });
-  };
+  }, [assignedRides]);
 
   // Handle Selection of a Ride Request for Dispatch
   const handleSelectRide = (ride) => {
@@ -583,7 +608,7 @@ const RideDispatch = () => {
 
   const fetchRides = loadRides;
 
-  // Handle Dispatch via POST /api/ride/assign (and PATCH /api/rides/:id/dispatch)
+  // Handle Dispatch: assign driver, optimistically update, and switch to Driver Panel Tab
   const handleDispatch = async (driver) => {
     if (!selectedRide) return;
     const currentSelected = selectedRide;
@@ -616,9 +641,21 @@ const RideDispatch = () => {
       return r;
     }));
 
-    setToastMessage(`✓ Ride ${currentSelected.requestId || currentSelected.id || 'REQ'} successfully dispatched to ${driverName}!`);
+    // Update driver in local state to "On Trip"
+    setAvailableDriversLocal(prev => prev.map(d => {
+      if (String(d._id) === String(driverId) || String(d.id) === String(driverId)) {
+        return { ...d, availability: 'On Trip' };
+      }
+      return d;
+    }));
+
+    setToastMessage(`✓ Ride ${currentSelected.requestId || currentSelected.id || 'REQ'} successfully assigned to ${driverName}! Showing in Driver Panel.`);
     setToastActionDriver(driver);
     setSelectedRide(null);
+
+    // Auto-switch to "Driver Panel & Live Assigned Rides" tab
+    setActiveMainTab('driver-panel');
+    setDriverPanelFilter('assigned');
 
     setTimeout(() => {
       setToastMessage('');
@@ -1296,7 +1333,7 @@ const RideDispatch = () => {
               <button 
                 type="button"
                 className={`radio-btn ${driverPanelFilter === 'all' ? 'active' : ''}`}
-                onClick={() => setDriverPanelFilter === 'all'}
+                onClick={() => setDriverPanelFilter('all')}
               >All ({availableDriversLocal.length})</button>
               <button 
                 type="button"

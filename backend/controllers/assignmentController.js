@@ -268,7 +268,8 @@ export const getDriverAssignedRides = async (req, res, next) => {
 // @route   GET /api/rides
 export const getAllRides = async (req, res, next) => {
   try {
-    const rawCustomerRides = await RideDB.find({}, { createdAt: -1, updatedAt: -1 }, 0, 100);
+    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+    const rawCustomerRides = await RideDB.find({}, { _id: -1 }, 0, 200);
     const formattedCustomerRides = (rawCustomerRides || []).map(formatRideRecord);
 
     const idMap = new Map();
