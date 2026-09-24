@@ -167,23 +167,61 @@
   font-weight: 500;
 }
 
+/* Custom table styling for driver ratings */
+.clean-table.driver-rating-table {
+  width: 100%;
+  table-layout: auto !important;
+  border-collapse: collapse;
+}
+
+.clean-table.driver-rating-table th,
+.clean-table.driver-rating-table td {
+  vertical-align: middle;
+  padding: 0.95rem 1rem;
+}
+
 .driver-id-badge {
-  font-family: monospace;
+  display: inline-flex;
+  align-items: center;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   font-weight: 700;
-  font-size: 0.8rem;
-  padding: 0.25rem 0.55rem;
+  font-size: 0.78rem;
+  padding: 0.25rem 0.6rem;
   background: var(--bg-secondary, #f1f5f9);
   border: 1px solid var(--border-color, #cbd5e1);
   border-radius: 6px;
   color: var(--text-primary, #334155);
+  letter-spacing: 0.3px;
+  white-space: nowrap;
+  max-width: 130px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .completed-rides-pill {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.84rem;
+  gap: 0.4rem;
+  font-size: 0.82rem;
+  font-weight: 500;
   color: var(--text-primary, #1e293b);
+  background: var(--bg-secondary, #f8fafc);
+  padding: 0.25rem 0.6rem;
+  border-radius: 6px;
+  border: 1px solid var(--border-color, #e2e8f0);
+  white-space: nowrap;
+}
+
+.unrated-tag {
+  display: inline-block;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary, #94a3b8);
+  background: var(--bg-secondary, #f1f5f9);
+  padding: 0.2rem 0.55rem;
+  border-radius: 6px;
+  border: 1px dashed var(--border-color, #cbd5e1);
+  white-space: nowrap;
 }
 
 /* Rating Stars Row */

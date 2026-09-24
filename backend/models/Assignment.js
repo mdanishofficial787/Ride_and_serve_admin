@@ -40,8 +40,22 @@ const assignmentSchema = new mongoose.Schema({
 
 assignmentSchema.pre('save', async function (next) {
   if (!this.assignmentId) {
-    const count = await mongoose.model('Assignment').countDocuments();
-    this.assignmentId = `ASG-${5000 + count + 1}`;
+    try {
+      const lastDoc = await mongoose.model('Assignment').findOne().sort({ createdAt: -1 });
+      let nextNum = 5001;
+      if (lastDoc && lastDoc.assignmentId) {
+        const match = String(lastDoc.assignmentId).match(/ASG-(\d+)/);
+        if (match) nextNum = Math.max(nextNum, parseInt(match[1], 10) + 1);
+      }
+      const count = await mongoose.model('Assignment').countDocuments();
+      nextNum = Math.max(nextNum, 5000 + count + 1);
+      while (await mongoose.model('Assignment').exists({ assignmentId: `ASG-${nextNum}` })) {
+        nextNum++;
+      }
+      this.assignmentId = `ASG-${nextNum}`;
+    } catch (e) {
+      this.assignmentId = `ASG-${Date.now().toString().slice(-6)}`;
+    }
   }
   next();
 });

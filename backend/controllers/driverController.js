@@ -151,10 +151,14 @@ export const createDriver = async (req, res, next) => {
 
     const newDriverData = {
       name,
+      Name: name,
       email,
+      Email: email,
       phone,
+      PhoneNumber: phone,
       vehicleType: vehicleType || 'Sedan',
       status: 'PENDING',
+      verificationStatus: 'Pending',
       source: (source || 'MANUAL').toUpperCase(),
       rating: Number(rating) || 4.8,
       availability: 'Available',

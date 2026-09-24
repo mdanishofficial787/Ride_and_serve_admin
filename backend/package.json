@@ -7,7 +7,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node --watch server.js",
-    "seed": "node seed/seedData.js"
+    "seed": "node seed/seedData.js",
+    "customer-listener": "node scripts/customer_listener.js",
+    "driver-listener": "node scripts/driver_listener.js"
   },
   "dependencies": {
     "bcryptjs": "^3.0.3",

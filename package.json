@@ -7,7 +7,9 @@
     "dev": "vite --open",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "customer-listener": "node backend/scripts/customer_listener.js",
+    "driver-listener": "node backend/scripts/driver_listener.js"
   },
   "dependencies": {
     "axios": "^1.20.0",

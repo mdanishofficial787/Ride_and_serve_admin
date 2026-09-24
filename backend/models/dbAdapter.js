@@ -29,27 +29,44 @@ export const formatRideRecord = (r) => {
       ? (isPlain.dropLocation.address || 'Drop-off')
       : (isPlain.dropoffLocation || isPlain.dropLocation || 'Drop-off'));
 
-  const custName = cust.fullName || cust.name || isPlain.customerName || isPlain.passenger?.name || 'Customer';
-  const custPhone = cust.PhoneNumber || cust.phone || isPlain.customerPhone || isPlain.passenger?.phone || '';
-  const custEmail = cust.Email || cust.email || isPlain.customerEmail || isPlain.passenger?.email || '';
+  const custName = isPlain.passengerName || cust.fullName || cust.name || isPlain.customerName || isPlain.passenger?.name || 'Customer';
+  const custPhone = isPlain.passengerPhone || isPlain.phone || cust.PhoneNumber || cust.phone || isPlain.customerPhone || isPlain.passenger?.phone || '';
+  const custEmail = isPlain.passengerEmail || isPlain.email || cust.Email || cust.email || isPlain.customerEmail || isPlain.passenger?.email || '';
 
-  const fareFormatted = isPlain.fare !== undefined && isPlain.fare !== null
-    ? (typeof isPlain.fare === 'number' ? `AED ${isPlain.fare}` : String(isPlain.fare).startsWith('AED') || String(isPlain.fare).startsWith('Rs') ? String(isPlain.fare) : `Rs. ${isPlain.fare}`)
-    : 'AED 45';
+  const formattedFareNumber = (isPlain.fareFormatted && !isNaN(Number(String(isPlain.fareFormatted).replace(/[^0-9]/g, ''))))
+    ? Number(String(isPlain.fareFormatted).replace(/[^0-9]/g, ''))
+    : null;
 
-  const isAssigned = isPlain.status === 'ASSIGNED' || 
-                     isPlain.status === 'assigned' || 
-                     (isPlain.status && String(isPlain.status).toUpperCase().startsWith('DISPATCH')) ||
-                     (Boolean(isPlain.driverId) && String(isPlain.driverId) !== 'null' && String(isPlain.driverId).trim() !== '') ||
-                     (Boolean(isPlain.driver) && String(isPlain.driver) !== 'null' && String(isPlain.driver).trim() !== '') ||
-                     (Boolean(isPlain.assignedDriverId) && String(isPlain.assignedDriverId) !== 'null') ||
-                     Boolean(isPlain.assignedDriver) ||
-                     Boolean(isPlain.assignedDriverDetails?.name);
+  const rawFareNum = formattedFareNumber || (typeof isPlain.fare === 'number' && isPlain.fare >= 100
+    ? isPlain.fare 
+    : (isPlain.fare && Number(String(isPlain.fare).replace(/[^0-9.]/g, '')) >= 100
+        ? Number(String(isPlain.fare).replace(/[^0-9.]/g, ''))
+        : (isPlain.fare ? Math.round(Number(String(isPlain.fare).replace(/[^0-9.]/g, '')) * (Number(String(isPlain.fare).replace(/[^0-9.]/g, '')) < 1 ? 10000 : 1)) : 9500)));
+
+  const fareFormatted = isPlain.fareFormatted || `Rs. ${rawFareNum.toLocaleString()}`;
+
+  const rawStatusUpper = String(isPlain.status || '').trim().toUpperCase();
+  const isExplicitlyPending = rawStatusUpper === 'PENDING' || 
+                              rawStatusUpper === 'PENDING DISPATCH' || 
+                              rawStatusUpper === 'VISIBLE' || 
+                              rawStatusUpper === 'REJECTED' ||
+                              rawStatusUpper === 'DRAFT' ||
+                              !rawStatusUpper;
+
+  const isAssigned = !isExplicitlyPending && (
+    rawStatusUpper === 'ASSIGNED' || 
+    rawStatusUpper === 'ACCEPTED' || 
+    rawStatusUpper.startsWith('DISPATCH') ||
+    rawStatusUpper === 'ON TRIP' ||
+    rawStatusUpper === 'IN PROGRESS' ||
+    ((Boolean(isPlain.driverId) && String(isPlain.driverId) !== 'null' && String(isPlain.driverId).trim() !== '') && rawStatusUpper !== 'REJECTED')
+  );
 
   const dateStr = isPlain.date || (isPlain.createdAt ? new Date(isPlain.createdAt).toLocaleDateString() : 'Today');
   const timeStr = isPlain.timeToLeave || (isPlain.createdAt ? new Date(isPlain.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : '08:00 AM');
 
   return {
+    ...isPlain,
     _id: isPlain._id,
     id: isPlain.requestId || isPlain.rideId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
     requestId: isPlain.requestId || isPlain.rideId || `REQ-${String(isPlain._id).slice(-4).toUpperCase()}`,
@@ -74,21 +91,57 @@ export const formatRideRecord = (r) => {
       summary: `${pickup} ➔ ${drop}`,
       pickupLocation: pickup,
       dropLocation: drop,
-      passengers: `${isPlain.seatsNeeded || 1} Passenger(s)`
+      passengers: `${isPlain.passengersCount ?? isPlain.passengerCount ?? isPlain.seatsNeeded ?? 1} Passenger(s)`
     },
     date: dateStr,
-    timeToLeave: timeStr,
+    timeToLeave: isPlain.customSchedule?.toTime || isPlain.timeToLeave || timeStr,
+    timeToReach: isPlain.customSchedule?.fromTime || isPlain.timeToReach || '08:30 AM',
+    scheduleTime: isPlain.scheduleTime || isPlain.customSchedule?.fromTime || isPlain.timeToReach || '08:30 AM',
+    startingFrom: isPlain.customSchedule?.startDate || isPlain.startingFrom || dateStr,
+    scheduleType: isPlain.scheduleType || (isPlain.customSchedule ? 'Customize' : 'Mon - Fri'),
+    customSchedule: isPlain.customSchedule || null,
+    selectedDays: (Array.isArray(isPlain.customSchedule?.selectedDays) && isPlain.customSchedule.selectedDays.length > 0)
+      ? isPlain.customSchedule.selectedDays
+      : (Array.isArray(isPlain.selectedDays) && isPlain.selectedDays.length > 0
+          ? isPlain.selectedDays
+          : (isPlain.customSchedule?.days || isPlain.selectedDays || [])),
     scheduledTime: `${dateStr} ${timeStr}`.trim(),
-    fare: fareFormatted,
+    phone: custPhone,
+    userPhone: custPhone,
+    fare: rawFareNum,
+    fareAmount: rawFareNum,
+    price: rawFareNum,
     fareFormatted: fareFormatted,
-    seatsNeeded: isPlain.seatsNeeded || 1,
+    passengersCount: isPlain.passengersCount ?? isPlain.passengerCount ?? isPlain.seatsNeeded ?? isPlain.seats ?? isPlain.noOfSeats ?? isPlain.customSchedule?.passengersCount ?? 1,
+    seatsNeeded: isPlain.passengersCount ?? isPlain.passengerCount ?? isPlain.seatsNeeded ?? isPlain.seats ?? isPlain.noOfSeats ?? isPlain.customSchedule?.passengersCount ?? 1,
     rideType: isPlain.rideType || 'Standard',
-    vehiclePreference: isPlain.vehiclePreference || 'Sedan',
-    acRequired: isPlain.acRequired !== false,
+    vehiclePreference: isPlain.seatingArrangement || isPlain.vehicleType || isPlain.vehiclePreference || isPlain.customSchedule?.vehicleType || 'Sedan Executive',
+    vehicleType: isPlain.vehicleType || isPlain.seatingArrangement || isPlain.vehiclePreference || isPlain.customSchedule?.vehicleType || 'Sedan Executive',
+    seatingArrangement: isPlain.seatingArrangement || isPlain.vehicleType || isPlain.vehiclePreference || isPlain.customSchedule?.vehicleType || 'Sedan Executive',
+    tripType: (function() {
+      const raw = String(isPlain.tripType || isPlain.customSchedule?.tripType || isPlain.customSchedule?.rideType || isPlain.rideType || '').trim().toLowerCase();
+      if (raw.includes('one way') || raw.includes('single')) return 'One Way';
+      if (raw.includes('two way') || raw.includes('round trip')) return 'Two Way';
+      if (String(isPlain.scheduleType || '').toLowerCase().includes('two way')) return 'Two Way';
+      if (isPlain.customSchedule?.returnPickupLocation || isPlain.returnPickupLocation) return 'Two Way';
+      return 'One Way';
+    })(),
+    serviceType: isPlain.vehicleTypeSelection || isPlain.serviceType || isPlain.preferences?.vehicleArrangement || isPlain.customSchedule?.serviceType || 'Combined',
+    vehicleTypeSelection: isPlain.vehicleTypeSelection || isPlain.serviceType || isPlain.preferences?.vehicleArrangement || isPlain.customSchedule?.serviceType || 'Combined',
+    genderPreference: isPlain.genderPreference || isPlain.customSchedule?.genderPreference || (String(isPlain.gender || isPlain.passenger?.gender || '').toLowerCase().includes('female') ? 'Female Only' : (String(isPlain.gender || isPlain.passenger?.gender || '').toLowerCase().includes('both') ? 'Both' : 'Male Only')),
+    acPreference: (isPlain.acPreference === 'Non-AC' || isPlain.acPreference === 'Non AC' || isPlain.acRequired === false) ? 'Non-AC' : 'AC',
+    acRequired: isPlain.acRequired !== false && isPlain.acPreference !== 'Non-AC',
+    returnPickupLocation: isPlain.customSchedule?.returnPickupLocation || isPlain.returnPickupLocation || isPlain.returnPickup || null,
+    returnDropoffLocation: isPlain.customSchedule?.returnDropoffLocation || isPlain.returnDropoffLocation || isPlain.returnDropoff || null,
+    returnDateTime: isPlain.customSchedule?.returnDate ? `${isPlain.customSchedule.returnDate}${isPlain.customSchedule.returnTime ? ' ' + isPlain.customSchedule.returnTime : ''}` : (isPlain.returnDate ? `${isPlain.returnDate}${isPlain.returnTime ? ' ' + isPlain.returnTime : ''}` : null),
+    additionalNotes: isPlain.additionalNotes || isPlain.notes || isPlain.remarks || '',
+    notes: isPlain.additionalNotes || isPlain.notes || isPlain.remarks || '',
     status: isAssigned ? 'ASSIGNED' : 'Pending Dispatch',
     rawStatus: isPlain.status,
     driver: isPlain.driver || isPlain.driverId || null,
-    driverId: isPlain.driver || isPlain.driverId || null,
+    driverId: isPlain.driver || isPlain.driverId || isPlain.assignedDriverId || null,
+    assignedDriver: isPlain.assignedDriver || isPlain.assignedDriverName || null,
+    assignedDriverCode: isPlain.assignedDriverCode || null,
     assignedDriverDetails: isPlain.assignedDriverDetails || (drv._id ? {
       name: drv.Name || drv.name,
       phone: drv.PhoneNumber || drv.phone,
@@ -175,41 +228,18 @@ export const RideDB = {
           if (query && Object.keys(query).length > 0) {
             mongoFilter = query;
           }
-          const appReqs = await client.db('ride_and_serve').collection('riderequests').find(mongoFilter).sort({ _id: -1 }).limit(limit).toArray();
-          return appReqs.map(r => ({
-            _id: r._id,
-            id: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
-            requestId: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
-            rideId: r.requestId || `REQ-${String(r._id).slice(-4).toUpperCase()}`,
-            customerName: r.passengerName || 'Customer',
-            passengerName: r.passengerName || 'Customer',
-            passengerPhone: r.passengerPhone || '',
-            passengerEmail: r.passengerEmail || '',
-            passenger: {
-              name: r.passengerName || 'Customer',
-              phone: r.passengerPhone || '',
-              email: r.passengerEmail || '',
-              gender: r.gender || 'Male'
-            },
-            pickupLocation: r.pickupLocation || '',
-            dropLocation: r.dropoffLocation || r.dropLocation || '',
-            dropoffLocation: r.dropoffLocation || r.dropLocation || '',
-            route: `${r.pickupLocation} -> ${r.dropoffLocation || r.dropLocation}`,
-            fare: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
-            fareFormatted: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
-            scheduledTime: (r.startingFrom ? `${r.startingFrom} ` : '') + (r.timeToReach || r.scheduleTime || '08:30 AM'),
-            date: r.startingFrom || (r.createdAt ? new Date(r.createdAt).toLocaleDateString() : 'Today'),
-            timeToLeave: r.timeToReach || r.scheduleTime || '08:30 AM',
-            status: r.status || 'Pending Dispatch',
-            vehicleType: r.vehicleType || 'Sedan',
-            vehiclePreference: r.vehicleType || 'Sedan',
-            acPreference: r.acPreference || 'AC',
-            acRequired: (r.acPreference || 'AC').toUpperCase().includes('AC'),
-            assignedDriverDetails: r.assignedDriverDetails || null,
-            driverId: r.driverId || null,
-            createdAt: r.createdAt || new Date(),
-            updatedAt: r.updatedAt || new Date()
-          }));
+          const appReqs1 = await client.db('ride_and_serve').collection('riderequests').find(mongoFilter).sort({ _id: -1 }).limit(limit).toArray().catch(() => []);
+          const appReqs2 = await client.db('test').collection('riderequests').find(mongoFilter).sort({ _id: -1 }).limit(limit).toArray().catch(() => []);
+          const idSet = new Set();
+          const appReqs = [];
+          [...(appReqs1 || []), ...(appReqs2 || [])].forEach(r => {
+            const key = String(r._id);
+            if (!idSet.has(key)) {
+              idSet.add(key);
+              appReqs.push(r);
+            }
+          });
+          return appReqs.map(formatRideRecord);
         }
       } catch (e) {
         console.error('RideDB find error:', e);
@@ -227,28 +257,7 @@ export const RideDB = {
           const query = buildRideQuery(filter);
           const r = await client.db('ride_and_serve').collection('riderequests').findOne(query);
           if (r) {
-            return {
-              _id: r._id,
-              id: r.requestId || String(r._id),
-              requestId: r.requestId || String(r._id),
-              rideId: r.requestId || String(r._id),
-              customerName: r.passengerName || 'Customer',
-              passengerName: r.passengerName || 'Customer',
-              passengerPhone: r.passengerPhone || '',
-              pickupLocation: r.pickupLocation || '',
-              dropLocation: r.dropoffLocation || r.dropLocation || '',
-              dropoffLocation: r.dropoffLocation || r.dropLocation || '',
-              route: `${r.pickupLocation} -> ${r.dropoffLocation || r.dropLocation}`,
-              fare: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
-              fareFormatted: typeof r.fare === 'number' ? `Rs. ${r.fare.toLocaleString()}` : (r.fare || 'Rs. 9,500'),
-              scheduledTime: (r.startingFrom ? `${r.startingFrom} ` : '') + (r.timeToReach || r.scheduleTime || '08:30 AM'),
-              status: r.status || 'Pending Dispatch',
-              vehicleType: r.vehicleType || 'Sedan',
-              vehiclePreference: r.vehicleType || 'Sedan',
-              acPreference: r.acPreference || 'AC',
-              assignedDriverDetails: r.assignedDriverDetails || null,
-              driverId: r.driverId || null
-            };
+            return formatRideRecord(r);
           }
         }
       } catch (e) {

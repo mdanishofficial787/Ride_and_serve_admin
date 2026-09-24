@@ -13,7 +13,7 @@ export const memoryStore = {
 };
 
 export const connectDB = async () => {
-  const uri = process.env.MONGODB_URI || 'mongodb+srv://sadiarafiquedev_db_user:KhmXmAyYP9SxabFR@cluster0.yhrbvje.mongodb.net/test?appName=Cluster0';
+  const uri = process.env.MONGODB_URI || 'mongodb+srv://sadiarafiquedev_db_user:KhmXmAyYP9SxabFR@cluster0.yhrbvje.mongodb.net/ride_and_serve?appName=Cluster0';
 
   try {
     const conn = await mongoose.connect(uri, {

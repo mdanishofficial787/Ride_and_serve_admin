@@ -62,7 +62,8 @@ const RidePool = () => {
       const data = await res.json();
       if (data.success && data.data?.requests) {
         // Exclude customer dispatch ride requests (REQ-) so only actual ride pools are shown in Ride Pool
-        const poolRequests = data.data.requests.filter(r => !String(r.requestId || r.id).startsWith('REQ-'));
+        // Removed REQ- filter because manual Ride Pool requests currently generate with REQ- prefix.
+        const poolRequests = data.data.requests;
         const mapped = poolRequests.map(r => {
           const vCat = r.vehiclePreference || 'Sedan';
           const maxCap = r.maxSeats || VEHICLE_MAX_SEATS[vCat] || 4;

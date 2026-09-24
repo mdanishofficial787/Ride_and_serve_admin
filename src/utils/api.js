@@ -2,7 +2,7 @@ export const BACKEND_URL = (typeof window !== 'undefined' && (window.location.ho
   ? 'http://localhost:5000'
   : (import.meta.env.VITE_BACKEND_URL || 'http://localhost:5000');
 
-export const MOBILE_BACKEND_URL = 'http://192.168.88.132:3000';
+export const MOBILE_BACKEND_URL = 'http://192.168.88.59:3000';
 
 const API_BASE_URL = `${BACKEND_URL}/api`;
 
@@ -127,13 +127,13 @@ export const AssignmentAPI = {
 };
 
 export const RideAPI = {
-  // GET /api/rides - Fetch all rides from 192.168.88.132:3000, localhost:3000, or localhost:5000
+  // GET /api/rides - Fetch all rides from 192.168.88.59:3000, localhost:3000, or localhost:5000
   getAllRides: async () => {
-    // 1. Try mobile URL http://192.168.88.132:3000
+    // 1. Try mobile URL http://192.168.88.59:3000
     try {
       const ctrl = new AbortController();
-      const tid = setTimeout(() => ctrl.abort(), 1000);
-      const resMob = await fetch('http://192.168.88.132:3000/api/rides', { signal: ctrl.signal });
+      const tid = setTimeout(() => ctrl.abort(), 10000);
+      const resMob = await fetch('http://192.168.88.59:3000/api/rides', { signal: ctrl.signal });
       clearTimeout(tid);
       if (resMob.ok) {
         const dataMob = await resMob.json();
@@ -179,8 +179,8 @@ export const RideAPI = {
   },
 
   // PATCH /api/rides/:id/dispatch - Fast Dispatch Driver to Ride
-  dispatch: async (rideId, driverName, driverId = null) => {
-    const payload = { driverName, driverId };
+  dispatch: async (rideId, driverName, driverId = null, extraData = {}) => {
+    const payload = { driverName, driverId, ...extraData };
 
     // 1. Direct call to main backend (Port 5000) - Instant (<20ms)
     try {
@@ -192,7 +192,7 @@ export const RideAPI = {
       if (patchRes.ok) {
         const data = await patchRes.json();
         // Fire-and-forget background ping to mobile app endpoints
-        fetch(`http://192.168.88.132:3000/api/rides/${rideId}/dispatch`, {
+        fetch(`http://192.168.88.59:3000/api/rides/${rideId}/dispatch`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)
@@ -206,7 +206,7 @@ export const RideAPI = {
     // 2. Fallback to POST /api/ride/assign
     return request('/ride/assign', {
       method: 'POST',
-      body: JSON.stringify({ rideId, driverId, remarks: `Dispatched to ${driverName}` })
+      body: JSON.stringify({ rideId, driverId, remarks: `Dispatched to ${driverName}`, ...extraData })
     });
   },
 
@@ -230,7 +230,7 @@ export const RideAPI = {
       if (res.ok) {
         const data = await res.json();
         // Fire-and-forget background ping to mobile app endpoints
-        fetch('http://192.168.88.132:3000/api/ride/assign', {
+        fetch('http://192.168.88.59:3000/api/ride/assign', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(payload)

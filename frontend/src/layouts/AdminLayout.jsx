@@ -1,11 +1,16 @@
-import React, { useState, useEffect } from 'react';
-import { Outlet, NavLink } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import io from 'socket.io-client';
 import { 
-  Users, Calendar, FileText, Settings, Bell, Search, Car, AlertCircle, LogOut, Sun, Moon, X, KeyRound, Star 
+  Users, Calendar, FileText, Settings, Bell, Search, Car, AlertCircle, AlertTriangle, LogOut, Sun, Moon, X, KeyRound, Star 
 } from 'lucide-react';
 import './AdminLayout.css';
 
 const AdminLayout = ({ user, onLogout, onUpdateUser }) => {
+  const navigate = useNavigate();
+  const location = useLocation();
+  const notifDropdownRef = useRef(null);
+
   const [isDarkMode, setIsDarkMode] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [settingsTab, setSettingsTab] = useState('Profile');
@@ -14,6 +19,128 @@ const AdminLayout = ({ user, onLogout, onUpdateUser }) => {
   const [newPw, setNewPw] = useState('');
   const [confirmNewPw, setConfirmNewPw] = useState('');
   const [settingsMsg, setSettingsMsg] = useState('');
+  
+  // Unread badge and notification states
+  const [unreadIssuesCount, setUnreadIssuesCount] = useState(0);
+  const [isNotificationOpen, setIsNotificationOpen] = useState(false);
+  const [recentNotifications, setRecentNotifications] = useState([]);
+
+  // Mark issues as seen/read so badge disappears immediately
+  const markIssuesAsSeen = () => {
+    localStorage.setItem('admin_issues_last_seen_time', Date.now().toString());
+    setUnreadIssuesCount(0);
+  };
+
+  // When admin navigates to /driver-issues, automatically clear badge
+  useEffect(() => {
+    if (location.pathname === '/driver-issues') {
+      markIssuesAsSeen();
+    }
+  }, [location.pathname]);
+
+  // Click outside to close notification dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (notifDropdownRef.current && !notifDropdownRef.current.contains(event.target)) {
+        setIsNotificationOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  // Real-time listener and fetch for driver reported issues
+  useEffect(() => {
+    const fetchCount = async () => {
+      const urls = [
+        'http://localhost:5000/admin/issues',
+        'http://localhost:5000/admin/issues',
+        'http://localhost:5000/admin/issues',
+        'http://localhost:5000/api/issues'
+      ];
+      const token = localStorage.getItem('adminToken') || localStorage.getItem('admin_token') || '';
+      for (const url of urls) {
+        try {
+          const res = await fetch(url, {
+            headers: { 'Authorization': `Bearer ${token}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            const list = data.issues || data.data || [];
+            setRecentNotifications(list.slice(0, 6));
+
+            // If user is currently looking at Reported Issues, badge stays 0
+            if (window.location.pathname === '/driver-issues') {
+              setUnreadIssuesCount(0);
+              break;
+            }
+
+            const lastSeenStr = localStorage.getItem('admin_issues_last_seen_time');
+            if (!lastSeenStr) {
+              const pending = list.filter(i => (i.status || 'Pending') === 'Pending');
+              setUnreadIssuesCount(pending.length);
+            } else {
+              const lastSeenTime = parseInt(lastSeenStr, 10);
+              const newUnseen = list.filter(i => {
+                const createdTime = new Date(i.createdAt || 0).getTime();
+                return createdTime > lastSeenTime && (i.status || 'Pending') === 'Pending';
+              });
+              setUnreadIssuesCount(newUnseen.length);
+            }
+            break;
+          }
+        } catch (e) {}
+      }
+    };
+
+    fetchCount();
+    const interval = setInterval(fetchCount, 30000);
+
+    const socketUrls = ['http://localhost:5000', 'http://localhost:5000'];
+    const sockets = [];
+    socketUrls.forEach(sUrl => {
+      try {
+        const s = io(sUrl, { transports: ['websocket', 'polling'] });
+        s.on('new_issue_report', (newIssue) => {
+          if (window.location.pathname !== '/driver-issues') {
+            setUnreadIssuesCount(prev => prev + 1);
+          }
+          if (newIssue) {
+            setRecentNotifications(prev => [newIssue, ...prev.filter(x => x.issueId !== newIssue.issueId).slice(0, 5)]);
+          }
+        });
+        s.on('new-issue-report', (newIssue) => {
+          if (window.location.pathname !== '/driver-issues') {
+            setUnreadIssuesCount(prev => prev + 1);
+          }
+          if (newIssue) {
+            setRecentNotifications(prev => [newIssue, ...prev.filter(x => x.issueId !== newIssue.issueId).slice(0, 5)]);
+          }
+        });
+        s.on('issue_updated', () => {
+          fetchCount();
+        });
+        s.on('customer-fare-response', (data) => {
+          setUnreadIssuesCount(prev => prev + 1);
+          if (data) {
+            setRecentNotifications(prev => [{ ...data, type: 'fare-response', notifId: Date.now() + Math.random() }, ...prev].slice(0, 5));
+          }
+        });
+        s.on('admin-notification', (data) => {
+          setUnreadIssuesCount(prev => prev + 1);
+          if (data) {
+            setRecentNotifications(prev => [{ ...data, type: 'fare-response', notifId: Date.now() + Math.random() }, ...prev].slice(0, 5));
+          }
+        });
+        sockets.push(s);
+      } catch (e) {}
+    });
+
+    return () => {
+      clearInterval(interval);
+      sockets.forEach(s => s.disconnect());
+    };
+  }, []);
 
   useEffect(() => {
     if (user?.name) setProfileName(user.name);
@@ -111,6 +238,19 @@ const AdminLayout = ({ user, onLogout, onUpdateUser }) => {
               <NavLink to="/driver-selection" className={({isActive}) => isActive ? "nav-link active" : "nav-link"}>
                 <Car size={18} />
                 <span>Ride Dispatch</span>
+              </NavLink>
+            </li>
+            <li className="nav-item">
+              <NavLink 
+                to="/driver-issues" 
+                className={({isActive}) => isActive ? "nav-link active" : "nav-link"}
+                onClick={markIssuesAsSeen}
+              >
+                <AlertTriangle size={18} />
+                <span style={{ flex: 1 }}>Reported Issues</span>
+                {unreadIssuesCount > 0 && (
+                  <span className="nav-issue-counter">{unreadIssuesCount}</span>
+                )}
               </NavLink>
             </li>
             <li className="nav-item">
@@ -282,6 +422,122 @@ const AdminLayout = ({ user, onLogout, onUpdateUser }) => {
           </div>
           
           <div className="header-actions">
+            <div className="notification-bell-wrapper" ref={notifDropdownRef}>
+              <button 
+                className="icon-btn notification-bell-btn" 
+                onClick={() => {
+                  markIssuesAsSeen();
+                  setIsNotificationOpen(prev => !prev);
+                }}
+                title={unreadIssuesCount > 0 ? `${unreadIssuesCount} new reported issues (click to view)` : 'Notifications'}
+              >
+                <Bell size={19} />
+                {unreadIssuesCount > 0 && (
+                  <span className="bell-badge">{unreadIssuesCount}</span>
+                )}
+              </button>
+
+              {/* Notification Dropdown Menu */}
+              {isNotificationOpen && (
+                <div className="notification-dropdown fade-in">
+                  <div className="notif-dropdown-header">
+                    <div className="notif-dropdown-title">
+                      <AlertTriangle size={16} className="text-warning mr-1" />
+                      <span>Driver Issue Alerts</span>
+                    </div>
+                    <button 
+                      className="notif-clear-btn"
+                      onClick={() => {
+                        markIssuesAsSeen();
+                        setIsNotificationOpen(false);
+                      }}
+                    >
+                      Clear Badge
+                    </button>
+                  </div>
+
+                  <div className="notif-dropdown-body">
+                    {recentNotifications.length === 0 ? (
+                      <div className="notif-empty">No recent notifications.</div>
+                    ) : (
+                      recentNotifications.map((item, idx) => {
+                        const isFareResponse = item.type === 'fare-response';
+                        const isAccepted = item.action === 'ACCEPTED';
+                        
+                        if (isFareResponse) {
+                          return (
+                            <div 
+                              key={item.notifId || item.rideId || idx}
+                              className="notif-dropdown-item"
+                              onClick={() => {
+                                markIssuesAsSeen();
+                                setIsNotificationOpen(false);
+                                navigate('/ride-dispatch');
+                              }}
+                            >
+                              <div className="notif-item-icon" style={{ color: isAccepted ? '#10B981' : '#EF4444' }}>
+                                <Bell size={16} />
+                              </div>
+                              <div className="notif-item-info">
+                                <div className="notif-item-top">
+                                  <span className="notif-item-name">{item.title || (isAccepted ? '✅ Fare Approved' : '❌ Fare Rejected')}</span>
+                                </div>
+                                <div className="notif-item-desc" style={{ marginTop: '4px', color: '#64748B', fontSize: '0.8rem' }}>
+                                  {item.message || `Customer ${item.customerName || ''} has ${item.action || 'responded'} to the fare ${item.fareFormatted || ''}.`}
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+
+                        // Original Driver Issue Notification
+                        return (
+                          <div 
+                            key={item.issueId || item._id || idx}
+                            className="notif-dropdown-item"
+                            onClick={() => {
+                              markIssuesAsSeen();
+                              setIsNotificationOpen(false);
+                              navigate('/driver-issues');
+                            }}
+                          >
+                            <div className="notif-item-icon">
+                              <AlertCircle size={16} />
+                            </div>
+                            <div className="notif-item-info">
+                              <div className="notif-item-top">
+                                <span className="notif-item-name">{item.driverName || 'Driver'}</span>
+                                <span className={`notif-item-status ${(item.status || 'Pending').toLowerCase()}`}>
+                                  {item.status || 'Pending'}
+                                </span>
+                              </div>
+                              <div className="notif-item-reason">{item.reason || 'Road Issue'}</div>
+                              {item.description && (
+                                <div className="notif-item-desc">{item.description}</div>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+
+                  <div className="notif-dropdown-footer">
+                    <button 
+                      className="notif-view-all-btn"
+                      onClick={() => {
+                        markIssuesAsSeen();
+                        setIsNotificationOpen(false);
+                        navigate('/driver-issues');
+                      }}
+                    >
+                      View All in Reported Issues →
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
             <button className="icon-btn theme-toggle-btn" onClick={toggleTheme}>
               {isDarkMode ? <Sun size={20} /> : <Moon size={20} />}
             </button>

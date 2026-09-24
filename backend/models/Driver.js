@@ -68,7 +68,7 @@ const driverSchema = new mongoose.Schema({
   toObject: { virtuals: true }
 });
 
-driverSchema.pre('save', async function (next) {
+driverSchema.pre('validate', async function (next) {
   // Auto-generate reference IDs if missing
   if (!this.driverReferenceId) {
     const count = await mongoose.model('Driver').countDocuments();

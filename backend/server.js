@@ -50,6 +50,33 @@ io.on('connection', (socket) => {
       console.log(`[Socket.IO] Driver ${driverId} joined room: driver-${driverId}`);
     }
   });
+
+  // Customer joins room to receive ride updates & driver unavailable alerts in real-time
+  socket.on('join-customer', (customerId) => {
+    socket.join('customer-room');
+    if (customerId) {
+      socket.join(`customer-${customerId}`);
+      console.log(`[Socket.IO] Customer ${customerId} joined room: customer-${customerId}`);
+    } else {
+      console.log(`[Socket.IO] Customer joined customer-room: ${socket.id}`);
+    }
+  });
+
+  // Join specific ride room for real-time ride tracking
+  socket.on('join-ride', (rideId) => {
+    if (rideId) {
+      socket.join(`ride-${rideId}`);
+      console.log(`[Socket.IO] Client ${socket.id} joined ride room: ride-${rideId}`);
+    }
+  });
+
+  // Real-time replacement request trigger from Customer App
+  socket.on('customer-request-replacement', async (data) => {
+    console.log('[Socket.IO] 🔔 Customer requested replacement driver:', data);
+    io.emit('new-replacement-request', data);
+    io.to('admin-room').emit('new-replacement-request', data);
+    io.to('admin-room').emit('replacement-requested', data);
+  });
 });
 
 // Make io accessible globally for controllers
@@ -104,8 +131,26 @@ app.use('/api/assignments', assignmentRoutes);
 app.use('/api/ride', rideRoutes);
 app.use('/api/rides', rideRoutes);
 
+import driverHireRoutes from './routes/driverHireRoutes.js';
+app.use('/api/driver-hire', driverHireRoutes);
+app.use('/api/driver-hires', driverHireRoutes);
+
+import replacementRoutes from './routes/replacementRoutes.js';
+app.use('/api/replacement-requests', replacementRoutes);
+
+import customerRoutes from './routes/customerRoutes.js';
+app.use('/api/customer', customerRoutes);
+
+// Schedule Rides & Travel Tourism Routes
+import scheduleRideRoutes from './routes/scheduleRideRoutes.js';
+app.use('/api/schedule-rides', scheduleRideRoutes);
+
+import travelRequestRoutes from './routes/travelRequestRoutes.js';
+app.use('/api/travel-requests', travelRequestRoutes);
+
 import adminPasswordResetRoutes from './routes/adminPasswordResetRoutes.js';
 import adminDriverRatingRoutes from './routes/adminDriverRatingRoutes.js';
+import issueRoutes from './routes/issueRoutes.js';
 
 // Admin Panel Verification API Routes
 app.use('/admin/auth', adminAuthRoutes);
@@ -113,6 +158,8 @@ app.use('/admin/driver', adminDriverRoutes);
 app.use('/admin/vehicle', adminVehicleRoutes);
 app.use('/admin/password-resets', adminPasswordResetRoutes);
 app.use('/admin/ratings', adminDriverRatingRoutes);
+app.use('/admin/issues', issueRoutes);
+app.use('/api/issues', issueRoutes);
 
 // Error Handling Middlewares
 app.use(notFoundHandler);
@@ -148,27 +195,96 @@ const startServer = async () => {
         console.log('====================================================');
       });
 
-      // Background Real-Time Watcher for Incoming Customer Rides
-      let lastKnownLatestId = null;
+      // Background Real-Time Watcher for Incoming Customer Rides (1-second polling across databases)
+      const knownRideIds = new Set();
+      let isWatcherInitialized = false;
+
       setInterval(async () => {
         try {
           const mongoose = (await import('mongoose')).default;
           const client = mongoose.connection?.client;
           if (client && mongoose.connection.readyState === 1) {
-            const latest = await client.db('ride_and_serve').collection('riderequests').find({}).sort({ _id: -1 }).limit(1).toArray();
-            if (latest && latest.length > 0) {
-              const latestIdStr = String(latest[0]._id);
-              if (lastKnownLatestId && lastKnownLatestId !== latestIdStr) {
-                console.log(`[Realtime Watcher] New Customer Ride Detected: ${latest[0].requestId || latestIdStr}`);
-                io.emit('new-ride', latest[0]);
-                io.emit('ride-created', latest[0]);
-                io.to('admin-room').emit('new-ride', latest[0]);
+            const ridesRas = await client.db('ride_and_serve').collection('riderequests').find({}).sort({ _id: -1 }).limit(25).toArray().catch(() => []);
+            const ridesTest = await client.db('test').collection('riderequests').find({}).sort({ _id: -1 }).limit(25).toArray().catch(() => []);
+            const latestRides = [...(ridesRas || []), ...(ridesTest || [])];
+
+            if (latestRides && latestRides.length > 0) {
+              if (!isWatcherInitialized) {
+                latestRides.forEach(r => knownRideIds.add(String(r._id)));
+                isWatcherInitialized = true;
+              } else {
+                for (const ride of latestRides) {
+                  const idStr = String(ride._id);
+                  if (!knownRideIds.has(idStr)) {
+                    knownRideIds.add(idStr);
+                    console.log(`[Realtime Watcher] 🔔 New Customer Ride Detected: ${ride.requestId || idStr} (${ride.passengerName || 'Customer'})`);
+                    io.emit('new-ride', ride);
+                    io.emit('ride-created', ride);
+                    io.to('admin-room').emit('new-ride', ride);
+                  }
+                }
               }
-              lastKnownLatestId = latestIdStr;
             }
           }
         } catch (e) {}
       }, 1000);
+
+      // Background Real-Time Watcher for Incoming Driver Reported Issues
+      const knownIssueIds = new Set();
+      let isIssueWatcherInitialized = false;
+
+      setInterval(async () => {
+        try {
+          const mongoose = (await import('mongoose')).default;
+          const client = mongoose.connection?.client;
+          if (client && mongoose.connection.readyState === 1) {
+            const issuesTest = await client.db('test').collection('issuereports').find({}).sort({ createdAt: -1 }).limit(20).toArray().catch(() => []);
+            const issuesRas = await client.db('ride_and_serve').collection('driverissues').find({}).sort({ createdAt: -1 }).limit(20).toArray().catch(() => []);
+            const latestIssues = [...(issuesTest || []), ...(issuesRas || [])];
+
+            if (latestIssues && latestIssues.length > 0) {
+              if (!isIssueWatcherInitialized) {
+                latestIssues.forEach(i => knownIssueIds.add(String(i._id)));
+                isIssueWatcherInitialized = true;
+              } else {
+                for (const iss of latestIssues) {
+                  const idStr = String(iss._id);
+                  if (!knownIssueIds.has(idStr)) {
+                    knownIssueIds.add(idStr);
+                    console.log(`[Realtime Watcher] 🔔 New Driver Issue Detected: ${iss.reason || 'Road Issue'} from ${iss.driverName || 'Driver'}`);
+                    
+                    const normalizedIssue = {
+                      _id: iss._id,
+                      mongoId: idStr,
+                      issueId: iss.issueId || `ISS-${idStr.slice(-4).toUpperCase()}`,
+                      driverId: iss.driver || iss.driverId || null,
+                      driverName: iss.driverName || 'Driver',
+                      driverPhone: iss.driverPhone || '',
+                      vehicle: iss.vehicle || 'Sedan Executive',
+                      reason: iss.reason || 'Road Issue',
+                      description: iss.details || iss.description || '',
+                      details: iss.details || iss.description || '',
+                      location: iss.location || (iss.fromTime && iss.toTime ? `${iss.fromTime} - ${iss.toTime}` : 'Current Location'),
+                      fromTime: iss.fromTime || '',
+                      toTime: iss.toTime || '',
+                      fromDate: iss.fromDate || null,
+                      toDate: iss.toDate || null,
+                      status: iss.status || 'Pending',
+                      severity: iss.severity || (iss.reason === 'Emergency' || iss.reason === 'Vehicle Issue' ? 'High' : 'Medium'),
+                      createdAt: iss.createdAt || new Date()
+                    };
+
+                    io.emit('new_issue_report', normalizedIssue);
+                    io.emit('new-issue-report', normalizedIssue);
+                    io.emit('driver-issue-created', normalizedIssue);
+                    io.to('admin-room').emit('new_issue_report', normalizedIssue);
+                  }
+                }
+              }
+            }
+          }
+        } catch (e) {}
+      }, 1500);
 
       httpServer.on('error', (err) => {
         if (err.code === 'EADDRINUSE') {

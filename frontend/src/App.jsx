@@ -8,6 +8,7 @@ import RidePool from './pages/RidePool';
 import PendingRides from './pages/PendingRides';
 import PasswordResetRequests from './pages/PasswordResetRequests';
 import DriverRating from './pages/DriverRating';
+import DriverIssues from './pages/DriverIssues';
 import AuthPage from './pages/AuthPage';
 import './App.css';
 
@@ -50,6 +51,7 @@ function App() {
           <Route path="driver-selection" element={<RideDispatch />} />
           <Route path="admin-dispatch" element={<AdminRideDispatch />} />
           <Route path="driver-rating" element={<DriverRating />} />
+          <Route path="driver-issues" element={<DriverIssues />} />
           <Route path="ride-pool" element={<RidePool />} />
           <Route path="pending-rides" element={<PendingRides />} />
         </Route>

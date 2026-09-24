@@ -18,6 +18,21 @@ const PERFORMANCE_TAG_OPTIONS = [
   'Needs Improvement'
 ];
 
+const formatDriverCode = (id) => {
+  if (!id) return 'DRV-1001';
+  const str = String(id).trim();
+  if (str.includes('-')) {
+    const parts = str.split('-');
+    if (parts.length >= 3) {
+      return `${parts[0]}-${parts[parts.length - 1].toUpperCase()}`;
+    }
+  }
+  if (str.length > 12) {
+    return `DRV-${str.slice(-6).toUpperCase()}`;
+  }
+  return str;
+};
+
 const DriverRating = () => {
   const [drivers, setDrivers] = useState([]);
   const [kpis, setKpis] = useState({
@@ -393,15 +408,15 @@ const DriverRating = () => {
 
         {/* Drivers Rating Table */}
         <div className="table-content">
-          <table className="clean-table">
+          <table className="clean-table driver-rating-table">
             <colgroup>
-              <col style={{ width: '250px' }} />
-              <col style={{ width: '130px' }} />
-              <col style={{ width: '140px' }} />
-              <col style={{ width: '200px' }} />
-              <col style={{ width: '150px' }} />
-              <col style={{ width: '130px' }} />
-              <col style={{ width: '220px' }} />
+              <col style={{ minWidth: '220px', width: '22%' }} />
+              <col style={{ minWidth: '130px', width: '13%' }} />
+              <col style={{ minWidth: '140px', width: '14%' }} />
+              <col style={{ minWidth: '180px', width: '18%' }} />
+              <col style={{ minWidth: '130px', width: '13%' }} />
+              <col style={{ minWidth: '120px', width: '10%' }} />
+              <col style={{ minWidth: '180px', width: '10%' }} />
             </colgroup>
             <thead>
               <tr>
@@ -428,6 +443,7 @@ const DriverRating = () => {
                   const ratingVal = isRated ? driver.currentRating : null;
                   const ridesCount = driver.completedRides || 0;
                   const isTopPerformer = isRated && ratingVal >= 4.8;
+                  const formattedCode = formatDriverCode(driver.driverId);
 
                   return (
                     <tr key={driver._id || driver.id}>
@@ -435,12 +451,24 @@ const DriverRating = () => {
                       <td>
                         <div className="driver-profile-cell">
                           {driver.photo ? (
-                            <img src={driver.photo} alt={driver.name} className="driver-table-avatar" />
-                          ) : (
-                            <div className="driver-avatar-placeholder">
-                              {(driver.name || 'D').charAt(0).toUpperCase()}
-                            </div>
-                          )}
+                            <img 
+                              src={driver.photo} 
+                              alt={driver.name} 
+                              className="driver-table-avatar" 
+                              onError={(e) => {
+                                e.currentTarget.style.display = 'none';
+                                if (e.currentTarget.nextElementSibling) {
+                                  e.currentTarget.nextElementSibling.style.display = 'flex';
+                                }
+                              }}
+                            />
+                          ) : null}
+                          <div 
+                            className="driver-avatar-placeholder"
+                            style={{ display: driver.photo ? 'none' : 'flex' }}
+                          >
+                            {(driver.name || 'D').charAt(0).toUpperCase()}
+                          </div>
                           <div className="driver-info-meta">
                             <div className="driver-name-row">
                               <span className="driver-full-name">{driver.name}</span>
@@ -455,13 +483,18 @@ const DriverRating = () => {
 
                       {/* Driver ID */}
                       <td>
-                        <span className="driver-id-badge">{driver.driverId}</span>
+                        <span 
+                          className="driver-id-badge" 
+                          title={`Full Driver ID: ${driver.driverId || 'N/A'}`}
+                        >
+                          {formattedCode}
+                        </span>
                       </td>
 
                       {/* Completed Rides */}
                       <td>
                         <div className="completed-rides-pill">
-                          <Car size={13} className="text-primary" />
+                          <Car size={13} className="text-primary flex-shrink-0" />
                           <span><strong>{ridesCount}</strong> rides</span>
                         </div>
                       </td>
@@ -477,7 +510,7 @@ const DriverRating = () => {
                               <span className="rating-score-num">{ratingVal.toFixed(1)}</span>
                             </>
                           ) : (
-                            <span className="text-secondary" style={{ fontSize: '0.84rem', color: '#94a3b8' }}>Unrated</span>
+                            <span className="unrated-tag">Unrated</span>
                           )}
                         </div>
                       </td>

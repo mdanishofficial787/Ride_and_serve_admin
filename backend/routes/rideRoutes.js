@@ -4,7 +4,8 @@ import {
   createAssignment, 
   getDriverAssignedRides,
   getAllRides,
-  dispatchDriverToRide 
+  dispatchDriverToRide,
+  updateRide
 } from '../controllers/assignmentController.js';
 
 const router = express.Router();
@@ -20,6 +21,10 @@ router.post('/assign', createAssignment);
 
 // PATCH /api/rides/:id/dispatch - Dispatch Driver to Ride (e.g. { driverName: "Ali Khan" })
 router.patch('/:id/dispatch', dispatchDriverToRide);
+
+// PATCH /api/rides/:id or PUT /api/rides/:id - Update ride details/fare
+router.patch('/:id', updateRide);
+router.put('/:id', updateRide);
 
 // GET /api/ride/assigned or /api/rides/assigned - Fetch all assigned rides (supports ?driverId=...)
 router.get('/assigned', getDriverAssignedRides);
