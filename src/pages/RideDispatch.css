@@ -5364,3 +5364,334 @@ body.dark-mode .schedule-actions-row {
 
 
 
+
+
+/* Fixes for Dark Mode UI Glitch */
+body.dark-mode .schedule-route-box,
+body.dark-mode .schedule-details-grid,
+body.dark-mode .schedule-card-footer,
+body.dark-mode .schedule-fare-box,
+body.dark-mode .dispatch-filters-toolbar {
+  background: var(--bg-tertiary) !important;
+  border-color: var(--border-color) !important;
+  color: var(--text-primary) !important;
+}
+
+body.dark-mode .dispatch-filters-toolbar {
+  background: var(--bg-secondary) !important;
+}
+
+
+
+/* More Fixes for Dark Mode UI Glitch */
+body.dark-mode .schedule-toolbar,
+body.dark-mode .hire-toolbar,
+body.dark-mode .replacement-toolbar {
+  background: var(--bg-secondary) !important;
+  border-color: var(--border-color) !important;
+}
+
+
+/* ========================================================
+   MOBILE APP PREVIEW MODAL (Flutter Driver App)
+   ======================================================== */
+.modal-backdrop {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(15, 23, 42, 0.7);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.phone-preview-shell {
+  width: 340px;
+  height: 680px;
+  background: #111827;
+  border-radius: 36px;
+  border: 12px solid #1F2937;
+  position: relative;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.5);
+  color: #F3F4F6;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+.phone-top-bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  position: relative;
+  z-index: 10;
+}
+
+.phone-notch {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 120px;
+  height: 24px;
+  background: #1F2937;
+  border-bottom-left-radius: 12px;
+  border-bottom-right-radius: 12px;
+}
+
+.phone-close-btn {
+  background: rgba(255, 255, 255, 0.2);
+  border: none;
+  color: white;
+  border-radius: 50%;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.phone-close-btn:hover { background: rgba(255, 255, 255, 0.3); }
+
+.phone-app-header {
+  padding: 16px 20px;
+  background: #1F2937;
+  border-bottom: 1px solid #374151;
+}
+
+.phone-driver-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #3B82F6;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 18px;
+}
+
+.phone-driver-name {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.phone-driver-status {
+  font-size: 12px;
+  color: #10B981;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.phone-app-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  background: #111827;
+}
+
+.phone-app-body::-webkit-scrollbar { display: none; }
+
+.section-heading-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+}
+
+.section-heading-row h5 {
+  margin: 0;
+  font-size: 14px;
+  color: #9CA3AF;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.badge-count-pill {
+  background: #3B82F6;
+  color: white;
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.phone-trip-card {
+  background: #1F2937;
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 16px;
+  border-left: 4px solid #F59E0B;
+}
+
+.phone-trip-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.trip-badge-alert {
+  background: rgba(245, 158, 11, 0.2);
+  color: #F59E0B;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 10px;
+  font-weight: bold;
+}
+
+.phone-fare {
+  color: #10B981;
+  font-size: 16px;
+}
+
+.phone-passenger-strip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #374151;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+.phone-call-btn {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #3B82F6;
+  color: white;
+  padding: 4px 10px;
+  border-radius: 16px;
+  font-size: 11px;
+  text-decoration: none;
+}
+
+.phone-route-box {
+  margin-top: 16px;
+  position: relative;
+}
+
+.phone-route-step {
+  display: flex;
+  gap: 12px;
+  position: relative;
+  z-index: 2;
+  margin-bottom: 16px;
+}
+
+.phone-route-step:last-child { margin-bottom: 0; }
+
+.dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+.green-dot { background: #10B981; }
+.red-dot { background: #EF4444; }
+
+.step-label {
+  font-size: 10px;
+  color: #9CA3AF;
+  font-weight: bold;
+  margin-bottom: 2px;
+}
+
+.step-text {
+  font-size: 13px;
+  color: #F3F4F6;
+  line-height: 1.4;
+}
+
+.phone-step-line {
+  position: absolute;
+  left: 4.5px;
+  top: 14px;
+  bottom: 20px;
+  width: 1px;
+  background: #4B5563;
+  z-index: 1;
+}
+
+.phone-actions-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+  padding-top: 16px;
+  border-top: 1px solid #374151;
+}
+
+.phone-nav-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #374151;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.phone-accept-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  background: #10B981;
+  color: white;
+  border: none;
+  padding: 10px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.phone-bottom-nav {
+  display: flex;
+  justify-content: space-around;
+  padding: 12px 0 20px 0;
+  background: #1F2937;
+  border-top: 1px solid #374151;
+}
+
+.nav-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  color: #9CA3AF;
+  font-size: 10px;
+}
+
+.nav-item.active {
+  color: #3B82F6;
+}
+
+.phone-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px 20px;
+  color: #9CA3AF;
+}

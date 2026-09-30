@@ -4,7 +4,7 @@ import {
   MapPin, Clock, Car, Filter, Star, CheckCircle, Search, ChevronLeft, Wind, 
   User, Phone, Mail, Calendar, DollarSign, Sparkles, X, Eye, ThumbsUp, ShieldCheck, ArrowRight, RotateCcw,
   Smartphone, Navigation, RefreshCw, Send, CheckCircle2, AlertCircle, Radio, Edit2, Check,
-  UserCheck, Briefcase, CreditCard, Users, Plus
+  UserCheck, Briefcase, CreditCard, Users, Plus, Zap, Edit3
 } from 'lucide-react';
 import LocationAutocomplete from '../components/LocationAutocomplete';
 import { RideAPI, BACKEND_URL } from '../utils/api';
@@ -2236,12 +2236,19 @@ const RideDispatch = () => {
     setToastActionDriver(driver);
     setSelectedRide(null);
 
-    // Auto-switch tab: If replacement request, stay on replacement tab; otherwise stay on requests table to see ASSIGNED row
+    // Auto-switch tab: Preserve the current tab and switch to its 'assigned' filter
     if (currentSelected.isReplacement || currentSelected.requestId?.startsWith('RPL-') || currentSelected._type === 'replacement') {
       setActiveMainTab('replacement-requests');
       setReplacementStatusFilter('assigned');
+    } else if (activeMainTab === 'schedule-rides') {
+      setScheduleStatusFilter('assigned');
+    } else if (activeMainTab === 'travel-requests') {
+      setTravelStatusFilter('assigned');
+    } else if (activeMainTab === 'hire-driver') {
+      setHireStatusFilter('assigned');
     } else {
       setActiveMainTab('requests');
+      setRequestStatusFilter('assigned');
     }
 
     setTimeout(() => {
@@ -3530,7 +3537,7 @@ const RideDispatch = () => {
             <p>No travel requests found.</p>
           </div>
         ) : (
-          <div className="schedule-grid">
+          <div className="schedule-cards-grid">
             {filteredTravelRequests.map(r => {
               const s = String(r.status || '').toUpperCase();
               let badgeClass = 'status-pending';
@@ -5189,3 +5196,6 @@ const RideDispatch = () => {
 };
 
 export default RideDispatch;
+
+
+

@@ -9,6 +9,8 @@ import PendingRides from './pages/PendingRides';
 import PasswordResetRequests from './pages/PasswordResetRequests';
 import DriverRating from './pages/DriverRating';
 import DriverIssues from './pages/DriverIssues';
+import PaymentTracking from './pages/PaymentTracking';
+import TermsConditions from './pages/TermsConditions';
 import AuthPage from './pages/AuthPage';
 import './App.css';
 
@@ -45,7 +47,7 @@ function App() {
     <Router>
       <Routes>
         <Route path="/" element={<AdminLayout user={user} onLogout={handleLogout} onUpdateUser={handleUpdateUser} />}>
-          <Route index element={<Navigate to="/pending-rides" replace />} />
+          <Route index element={<Navigate to="/terms-conditions" replace />} />
           <Route path="driver-approval" element={<DriverApproval />} />
           <Route path="password-resets" element={<PasswordResetRequests />} />
           <Route path="driver-selection" element={<RideDispatch />} />
@@ -54,6 +56,9 @@ function App() {
           <Route path="driver-issues" element={<DriverIssues />} />
           <Route path="ride-pool" element={<RidePool />} />
           <Route path="pending-rides" element={<PendingRides />} />
+          <Route path="payment-tracking" element={<PaymentTracking />} />
+          <Route path="/terms-conditions" element={<TermsConditions />} />
+          <Route path="*" element={<Navigate to="/pending-rides" replace />} />
         </Route>
       </Routes>
     </Router>

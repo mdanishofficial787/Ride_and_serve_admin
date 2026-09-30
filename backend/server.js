@@ -151,6 +151,7 @@ app.use('/api/travel-requests', travelRequestRoutes);
 import adminPasswordResetRoutes from './routes/adminPasswordResetRoutes.js';
 import adminDriverRatingRoutes from './routes/adminDriverRatingRoutes.js';
 import issueRoutes from './routes/issueRoutes.js';
+import termsRoutes from './routes/termsRoutes.js';
 
 // Admin Panel Verification API Routes
 app.use('/admin/auth', adminAuthRoutes);
@@ -160,6 +161,7 @@ app.use('/admin/password-resets', adminPasswordResetRoutes);
 app.use('/admin/ratings', adminDriverRatingRoutes);
 app.use('/admin/issues', issueRoutes);
 app.use('/api/issues', issueRoutes);
+app.use('/api/terms', termsRoutes);
 
 // Error Handling Middlewares
 app.use(notFoundHandler);

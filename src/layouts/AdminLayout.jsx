@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Outlet, NavLink, useNavigate, useLocation } from 'react-router-dom';
 import io from 'socket.io-client';
 import { 
-  Users, Calendar, FileText, Settings, Bell, Search, Car, AlertCircle, AlertTriangle, LogOut, Sun, Moon, X, KeyRound, Star 
+  Users, Calendar, FileText, Settings, Bell, Search, Car, AlertCircle, AlertTriangle, LogOut, Sun, Moon, X, KeyRound, Star, CreditCard 
 } from 'lucide-react';
 import './AdminLayout.css';
 
@@ -277,8 +277,25 @@ const AdminLayout = ({ user, onLogout, onUpdateUser }) => {
             </li>
           </ul>
 
+          <div className="nav-category mt-4">FINANCE</div>
+          <ul className="nav-list">
+            <li className="nav-item">
+              <NavLink to="/payment-tracking" className={({isActive}) => isActive ? "nav-link active" : "nav-link"}>
+                <CreditCard size={18} />
+                <span>Payment Tracking</span>
+              </NavLink>
+            </li>
+          </ul>
+
           <div className="nav-category mt-4">SETTINGS</div>
-          {/* Settings links can go here in the future */}
+          <ul className="nav-list">
+            <li className="nav-item">
+              <NavLink to="/terms-conditions" className={({isActive}) => isActive ? "nav-link active" : "nav-link"}>
+                <Settings size={18} />
+                <span>Terms & Conditions</span>
+              </NavLink>
+            </li>
+          </ul>
         </nav>
 
         <div className="sidebar-footer">

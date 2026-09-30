@@ -9,6 +9,7 @@ import PendingRides from './pages/PendingRides';
 import PasswordResetRequests from './pages/PasswordResetRequests';
 import DriverRating from './pages/DriverRating';
 import DriverIssues from './pages/DriverIssues';
+import PaymentTracking from './pages/PaymentTracking';
 import AuthPage from './pages/AuthPage';
 import './App.css';
 
@@ -54,6 +55,7 @@ function App() {
           <Route path="driver-issues" element={<DriverIssues />} />
           <Route path="ride-pool" element={<RidePool />} />
           <Route path="pending-rides" element={<PendingRides />} />
+          <Route path="payment-tracking" element={<PaymentTracking />} />
         </Route>
       </Routes>
     </Router>
